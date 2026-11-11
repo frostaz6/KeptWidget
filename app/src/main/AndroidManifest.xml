@@ -11,6 +11,8 @@
       </intent-filter>
     </activity>
     <activity android:name=".NoteEditorActivity" android:exported="false"/>
+    <activity android:name=".WidgetRouterActivity" android:exported="false"
+      android:theme="@android:style/Theme.Translucent.NoTitleBar"/>
     <activity android:name=".WidgetConfigActivity" android:exported="true"/>
     <receiver android:name=".CollectionWidgetProvider"
       android:label="@string/collection_widget" android:exported="true">
