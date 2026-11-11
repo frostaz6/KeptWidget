@@ -127,40 +127,36 @@ final class KeptApi {
         return token;
     }
 
+    private static final okhttp3.OkHttpClient HTTP = new okhttp3.OkHttpClient.Builder()
+        .followRedirects(false)
+        .followSslRedirects(false)
+        .connectTimeout(10, java.util.concurrent.TimeUnit.SECONDS)
+        .readTimeout(15, java.util.concurrent.TimeUnit.SECONDS)
+        .build();
+
     private static Object call(Context c, String method, String path, JSONObject body, String token)
             throws IOException, JSONException {
         String origin = SecureStore.baseUrl(c);
         URL base = new URL(origin);
         if (!"https".equalsIgnoreCase(base.getProtocol()) || base.getUserInfo() != null
-                || base.getQuery() != null || base.getRef() != null || !"/".equals(base.getPath().isEmpty() ? "/" : base.getPath()))
+                || base.getQuery() != null || base.getRef() != null
+                || !"/".equals(base.getPath().isEmpty() ? "/" : base.getPath()))
             throw new IOException("Use a secure HTTPS server origin (without a path).");
-        HttpURLConnection connection = (HttpURLConnection) new URL(origin + path).openConnection();
-        connection.setInstanceFollowRedirects(false);
-        connection.setConnectTimeout(10000);
-        connection.setReadTimeout(15000);
-        connection.setRequestMethod(method);
-        connection.setRequestProperty("Accept", "application/json");
-        if (!token.isEmpty()) connection.setRequestProperty("Authorization", "Bearer " + token);
-        try {
-            if (body != null) {
-                byte[] data = body.toString().getBytes(StandardCharsets.UTF_8);
-                connection.setDoOutput(true);
-                connection.setRequestProperty("Content-Type", "application/json; charset=utf-8");
-                connection.setFixedLengthStreamingMode(data.length);
-                try (OutputStream out = connection.getOutputStream()) { out.write(data); }
-            }
-            int status = connection.getResponseCode();
-            InputStream stream = status >= 400 ? connection.getErrorStream() : connection.getInputStream();
-            String raw = "";
-            if (stream != null) {
-                try (InputStream input = stream) {
-                    byte[] bytes = input.readNBytes(2_000_000);
-                    raw = new String(bytes, StandardCharsets.UTF_8);
-                }
-            }
+        okhttp3.Request.Builder builder = new okhttp3.Request.Builder()
+            .url(origin + path)
+            .header("Accept", "application/json");
+        if (!token.isEmpty()) builder.header("Authorization", "Bearer " + token);
+        okhttp3.RequestBody requestBody = body == null ? null :
+            okhttp3.RequestBody.create(body.toString(),
+                okhttp3.MediaType.get("application/json; charset=utf-8"));
+        builder.method(method, requestBody);
+        try (okhttp3.Response response = HTTP.newCall(builder.build()).execute()) {
+            int status = response.code();
+            String raw = response.body() == null ? "" : response.body().string();
             if (status < 200 || status >= 300) {
                 if (status == 401) throw new ApiException(status, "Session expired. Sign in again.");
-                if (status >= 300 && status < 400) throw new ApiException(status, "Unexpected redirect. Check the Kept URL.");
+                if (status >= 300 && status < 400)
+                    throw new ApiException(status, "Unexpected redirect. Check the Kept URL.");
                 String message = "Kept returned HTTP " + status;
                 try {
                     JSONObject error = new JSONObject(raw);
@@ -174,8 +170,6 @@ final class KeptApi {
             if (!(parsed instanceof JSONObject) && !(parsed instanceof JSONArray))
                 throw new IOException("Unexpected response from Kept.");
             return parsed;
-        } finally {
-            connection.disconnect();
         }
     }
 }
