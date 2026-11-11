@@ -27,19 +27,26 @@ public class CollectionWidgetProvider extends AppWidgetProvider {
         views.setRemoteAdapter(R.id.widget_notes, adapter);
         views.setEmptyView(R.id.widget_notes, R.id.widget_empty);
 
-        Intent row = new Intent(context, WidgetActionReceiver.class).setAction(WidgetActionReceiver.ACTION_ROW);
-        PendingIntent rowTemplate = PendingIntent.getBroadcast(context, id, row,
+        Intent row = new Intent(context, WidgetRouterActivity.class).setAction(WidgetActionReceiver.ACTION_ROW);
+        PendingIntent rowTemplate = PendingIntent.getActivity(context, id, row,
             PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_MUTABLE);
         views.setPendingIntentTemplate(R.id.widget_notes, rowTemplate);
 
         views.setOnClickPendingIntent(R.id.widget_header,
             PendingIntent.getActivity(context, id, new Intent(context, LoginActivity.class),
                 PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE));
-        views.setOnClickPendingIntent(R.id.widget_add_text, action(context, id * 10 + 1, WidgetActionReceiver.ACTION_ADD_NOTE));
-        views.setOnClickPendingIntent(R.id.widget_add_list, action(context, id * 10 + 2, WidgetActionReceiver.ACTION_ADD_LIST));
+        views.setOnClickPendingIntent(R.id.widget_add_text, editor(context, id * 10 + 1, false));
+        views.setOnClickPendingIntent(R.id.widget_add_list, editor(context, id * 10 + 2, true));
         views.setOnClickPendingIntent(R.id.widget_refresh, action(context, id * 10 + 3, WidgetActionReceiver.ACTION_REFRESH));
         manager.updateAppWidget(id, views);
         manager.notifyAppWidgetViewDataChanged(id, R.id.widget_notes);
+    }
+
+    static PendingIntent editor(Context context, int requestCode, boolean isList) {
+        Intent intent = new Intent(context, NoteEditorActivity.class);
+        intent.putExtra(NoteEditorActivity.EXTRA_LIST, isList);
+        return PendingIntent.getActivity(context, requestCode, intent,
+            PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
     }
 
     static PendingIntent action(Context context, int requestCode, String action) {
