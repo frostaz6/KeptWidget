@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+  android:layout_width="match_parent" android:layout_height="match_parent"
+  android:orientation="horizontal" android:gravity="center_vertical"
+  android:padding="6dp" android:background="@drawable/widget_bg">
+  <TextView android:id="@+id/capture_open" android:layout_width="0dp"
+    android:layout_height="match_parent" android:layout_weight="1"
+    android:gravity="center_vertical" android:paddingStart="12dp"
+    android:text="Kept" android:textStyle="bold" android:textColor="#24321D" android:textSize="16sp"/>
+  <TextView android:id="@+id/capture_note" android:layout_width="54dp"
+    android:layout_height="match_parent" android:gravity="center"
+    android:contentDescription="Create note" android:text="+" android:textColor="#294120" android:textSize="28sp"/>
+  <TextView android:id="@+id/capture_list" android:layout_width="54dp"
+    android:layout_height="match_parent" android:gravity="center"
+    android:contentDescription="Create checklist" android:text="☑"
+    android:textColor="#294120" android:textSize="25sp"/>
+</LinearLayout>
