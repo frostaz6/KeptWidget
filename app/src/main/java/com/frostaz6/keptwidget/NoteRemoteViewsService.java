@@ -2,6 +2,9 @@ package com.frostaz6.keptwidget;
 
 import android.appwidget.AppWidgetManager;
 import android.content.Context;
+import android.content.res.ColorStateList;
+import android.graphics.Color;
+import android.os.Build;
 import android.content.Intent;
 import android.view.View;
 import android.widget.RemoteViews;
@@ -31,7 +34,7 @@ public class NoteRemoteViewsService extends RemoteViewsService {
             this.widgetId = widgetId;
         }
 
-        @Override public void onCreate() { onDataSetChanged(); }
+        @Override public void onCreate() { /* onDataSetChanged runs off the UI thread. */ }
 
         @Override public synchronized void onDataSetChanged() {
             JSONArray fetched = null;
@@ -76,6 +79,18 @@ public class NoteRemoteViewsService extends RemoteViewsService {
             if (position < 0 || position >= notes.size()) return null;
             JSONObject note = notes.get(position);
             RemoteViews row = new RemoteViews(context.getPackageName(), R.layout.widget_note_row);
+            String bg = note.optString("bgColor", "");
+            if (Build.VERSION.SDK_INT >= 31 && !bg.isBlank()) {
+                try {
+                    int source = Color.parseColor(bg);
+                    // Keep dark text readable while honoring Kept's note color.
+                    int pastel = Color.rgb((Color.red(source) + 510) / 3,
+                        (Color.green(source) + 510) / 3,
+                        (Color.blue(source) + 510) / 3);
+                    row.setColorStateList(R.id.note_card, "setBackgroundTintList",
+                        ColorStateList.valueOf(pastel));
+                } catch (IllegalArgumentException ignored) { }
+            }
             long noteId = note.optLong("id", -1L);
             boolean locked = note.optBoolean("locked")
                 && !note.optBoolean("lockedContentAvailable", false);
