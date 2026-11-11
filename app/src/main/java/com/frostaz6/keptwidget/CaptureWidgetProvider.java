@@ -15,9 +15,9 @@ public class CaptureWidgetProvider extends AppWidgetProvider {
                 new Intent(context, LoginActivity.class),
                 PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE));
             views.setOnClickPendingIntent(R.id.capture_note,
-                CollectionWidgetProvider.action(context, id * 10 + 4, WidgetActionReceiver.ACTION_ADD_NOTE));
+                CollectionWidgetProvider.editor(context, id * 10 + 4, false));
             views.setOnClickPendingIntent(R.id.capture_list,
-                CollectionWidgetProvider.action(context, id * 10 + 5, WidgetActionReceiver.ACTION_ADD_LIST));
+                CollectionWidgetProvider.editor(context, id * 10 + 5, true));
             manager.updateAppWidget(id, views);
         }
     }
