@@ -57,7 +57,7 @@ public final class SingleNoteRemoteViewsService extends RemoteViewsService {
             } else {
                 checklist=false;
                 JSONObject body=new JSONObject();
-                try {body.put("data",KeptApi.plain(note.optString("noteBody"))); }
+                try {body.put("data",KeptApi.formatted(note.optString("noteBody"))); }
                 catch(Exception ignored){}
                 items.add(body);
             }
@@ -71,11 +71,14 @@ public final class SingleNoteRemoteViewsService extends RemoteViewsService {
             JSONObject item=items.get(position);
             RemoteViews row=new RemoteViews(context.getPackageName(),R.layout.widget_single_row);
             boolean done=item.optBoolean("done");
-            String body=checklist? KeptApi.plain(item.optString("data")):item.optString("data");
+            String body=checklist? KeptApi.formatted(item.optString("data")):item.optString("data");
+            boolean dark=WidgetAppearance.dark(context,widgetId);
             row.setTextViewText(R.id.single_item_text,body);
             row.setViewVisibility(R.id.single_checkbox,checklist?View.VISIBLE:View.GONE);
             if(checklist)row.setTextViewText(R.id.single_checkbox,done?"☑":"☐");
-            row.setTextColor(R.id.single_item_text,done?0xff8a8d88:0xff3c4339);
+            row.setTextColor(R.id.single_item_text,done?0xff8a8d88:WidgetAppearance.text(dark));
+            row.setTextColor(R.id.single_checkbox,WidgetAppearance.accent(dark));
+            if(!checklist)row.setInt(R.id.single_item_text,"setMaxLines",120);
 
             Intent open=new Intent();
             open.putExtra(NoteEditorActivity.EXTRA_ID,noteId);
