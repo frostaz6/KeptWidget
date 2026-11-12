@@ -33,7 +33,7 @@ public class CollectionWidgetProvider extends AppWidgetProvider {
         views.setPendingIntentTemplate(R.id.widget_notes, rowTemplate);
 
         views.setOnClickPendingIntent(R.id.widget_header,
-            PendingIntent.getActivity(context, id, new Intent(context, LoginActivity.class),
+            PendingIntent.getActivity(context, id, new Intent(context, NotesActivity.class),
                 PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE));
         views.setOnClickPendingIntent(R.id.widget_add_text, editor(context, id * 10 + 1, false));
         views.setOnClickPendingIntent(R.id.widget_add_list, editor(context, id * 10 + 2, true));
@@ -61,6 +61,7 @@ public class CollectionWidgetProvider extends AppWidgetProvider {
         for (int id : ids) render(context, manager, id);
         int[] quick = manager.getAppWidgetIds(new ComponentName(context, CaptureWidgetProvider.class));
         if (quick.length > 0) new CaptureWidgetProvider().onUpdate(context, manager, quick);
+        SingleNoteWidgetProvider.refreshAll(context);
     }
 
     @Override public void onDeleted(Context context, int[] ids) {
