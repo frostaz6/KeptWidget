@@ -58,6 +58,21 @@ public class NoteRemoteViewsService extends RemoteViewsService {
                 if (note != null && !note.optBoolean("archived") && !note.optBoolean("trashed")
                     && matches(note, filter)) notes.add(note);
             }
+            String sort=SecureStore.preferences(context).getString("sort_"+widgetId,"kept");
+            if(!"kept".equals(sort)){
+                java.util.Comparator<JSONObject> comparator;
+                if("title".equals(sort)){
+                    comparator=(a,b)->KeptApi.plain(a.optString("noteTitle"))
+                        .compareToIgnoreCase(KeptApi.plain(b.optString("noteTitle")));
+                }else if("oldest".equals(sort)){
+                    comparator=(a,b)->a.optString("updatedAt","")
+                        .compareTo(b.optString("updatedAt",""));
+                }else{
+                    comparator=(a,b)->b.optString("updatedAt","")
+                        .compareTo(a.optString("updatedAt",""));
+                }
+                notes.sort(comparator.thenComparingLong(n->n.optLong("id",0)));
+            }
         }
 
         private boolean matches(JSONObject note, String filter) {
@@ -134,7 +149,7 @@ public class NoteRemoteViewsService extends RemoteViewsService {
             if(note.optBoolean("syncPending"))footer += (footer.isEmpty()?"":"  ·  ")+
                 (note.optBoolean("syncConflict")?"⚠ Sync conflict":"⏳ Pending sync");
             if (checks != null && checks.length() > shown)
-                footer += (footer.isEmpty() ? "" : "  ·  ") + "+" + (checks.length()-shown) + " more shown in editor";
+                footer += (footer.isEmpty() ? "" : "  ·  ") + "More checklist items…";
             row.setTextViewText(R.id.note_footer, footer);
             row.setViewVisibility(R.id.note_footer, footer.isEmpty() ? View.GONE : View.VISIBLE);
             return row;
