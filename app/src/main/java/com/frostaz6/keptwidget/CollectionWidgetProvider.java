@@ -18,6 +18,7 @@ public class CollectionWidgetProvider extends AppWidgetProvider {
         RemoteViews views = new RemoteViews(context.getPackageName(), R.layout.widget_collection);
         String header = SecureStore.preferences(context).getString("title_" + id, "Kept");
         views.setTextViewText(R.id.widget_header, header);
+        WidgetAppearance.applyCollectionHeader(context,views,R.id.widget_root,id);
         views.setTextViewText(R.id.widget_empty, SecureStore.token(context).isEmpty()
             ? "Sign in to Kept Widget to show your notes." : "No notes yet, or unable to sync. Tap ↻ to retry.");
 
@@ -69,5 +70,6 @@ public class CollectionWidgetProvider extends AppWidgetProvider {
     @Override public void onDeleted(Context context, int[] ids) {
         for (int id : ids) SecureStore.preferences(context).edit()
             .remove("filter_" + id).remove("title_" + id).apply();
+        for (int id: ids) WidgetAppearance.clear(context,id);
     }
 }
