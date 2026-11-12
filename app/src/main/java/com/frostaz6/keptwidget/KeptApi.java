@@ -92,6 +92,24 @@ final class KeptApi {
         call(c, "PATCH", "/api/notes/" + id, fields, requireToken(c));
     }
 
+    /**
+     * This Kept version does not support server-side note revisions. Compare the
+     * specific fields we intend to modify before PATCH so ordinary edits don't
+     * overwrite unrelated newer server content.
+     */
+    static void patchIfUnchanged(Context c,long id,JSONObject fields,JSONObject baseline)
+        throws IOException,JSONException {
+        JSONObject remote=note(c,id);
+        java.util.Iterator<String> keys=fields.keys();
+        while(keys.hasNext()){
+            String k=keys.next();
+            Object now=remote.opt(k), before=baseline.opt(k), desired=fields.opt(k);
+            if(!PendingSync.equivalent(now,before) && !PendingSync.equivalent(now,desired))
+                throw new ApiException(409,"This note changed elsewhere ("+k+"). Reopen it before saving.");
+        }
+        patch(c,id,fields);
+    }
+
     /** Always reload the whole note: card previews intentionally truncate checklists. */
     static boolean toggleCheckbox(Context c, long noteId, long itemId) throws IOException, JSONException {
         synchronized (WRITE_LOCK) {
