@@ -34,7 +34,7 @@ jobs:
       - name: Upload debug APK
         uses: actions/upload-artifact@v4
         with:
-          name: KeptWidget-0.3.0-debug-APK
+          name: KeptWidget-development-debug-APK
           path: app/build/outputs/apk/debug/app-debug.apk
           if-no-files-found: error
       - name: Restore persistent release signing key
@@ -54,7 +54,7 @@ jobs:
         if: ${{ env.RELEASE_KEY_PRESENT == 'true' && github.ref == 'refs/heads/main' }}
         uses: actions/upload-artifact@v4
         with:
-          name: KeptWidget-0.3.0-signed-APK
+          name: KeptWidget-release-signed-APK
           path: app/build/outputs/apk/release/app-release.apk
           if-no-files-found: error
       - name: Explain missing signing configuration
