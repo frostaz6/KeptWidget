@@ -25,6 +25,7 @@ public final class SingleNoteConfigActivity extends Activity {
     private LinearLayout resultList;
     private TextView hint;
     private EditText search;
+    private WidgetAppearance.Controls appearance;
 
     @Override public void onCreate(Bundle state){
         super.onCreate(state);
@@ -36,6 +37,7 @@ public final class SingleNoteConfigActivity extends Activity {
         root.addView(ScreenUi.hint(this,
             "Choose a note or checklist. The widget lets you scroll and check off list items without opening the app."),
             ScreenUi.margins(this,0,0,0,14));
+        appearance=WidgetAppearance.controls(this,root,widgetId,false);
         search=ScreenUi.field(this,"Search your notes",InputType.TYPE_CLASS_TEXT);
         root.addView(search,ScreenUi.margins(this,0,0,0,12));
         hint=ScreenUi.hint(this,"Loading notes…");
@@ -97,6 +99,7 @@ public final class SingleNoteConfigActivity extends Activity {
     }
 
     private void select(long noteId){
+        appearance.save();
         SecureStore.preferences(this).edit().putLong("single_note_"+widgetId,noteId).apply();
         SingleNoteWidgetProvider.render(this,AppWidgetManager.getInstance(this),widgetId);
         Intent done=new Intent();
