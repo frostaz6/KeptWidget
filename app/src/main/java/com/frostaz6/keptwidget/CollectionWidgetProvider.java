@@ -61,6 +61,8 @@ public class CollectionWidgetProvider extends AppWidgetProvider {
         for (int id : ids) render(context, manager, id);
         int[] quick = manager.getAppWidgetIds(new ComponentName(context, CaptureWidgetProvider.class));
         if (quick.length > 0) new CaptureWidgetProvider().onUpdate(context, manager, quick);
+        int[] grid = manager.getAppWidgetIds(new ComponentName(context, GridCollectionWidgetProvider.class));
+        for (int id : grid) GridCollectionWidgetProvider.render(context, manager, id);
         SingleNoteWidgetProvider.refreshAll(context);
     }
 
