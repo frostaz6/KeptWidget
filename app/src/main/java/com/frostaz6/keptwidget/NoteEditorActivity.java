@@ -309,7 +309,7 @@ public class NoteEditorActivity extends Activity {
                     if (labelsTouched) payload.put("labels",chosenLabels);
                     if (payload.length() != 0) {
                         try {
-                            KeptApi.patch(this,id,payload);
+                            KeptApi.patchIfUnchanged(this,id,payload,before);
                         }catch(java.io.IOException network){
                             if(network instanceof KeptApi.ApiException)throw network;
                             PendingSync.edit(this,id,payload,before);
@@ -401,7 +401,7 @@ public class NoteEditorActivity extends Activity {
             try {
                 JSONObject change=new JSONObject().put(field,true);
                 try {
-                    KeptApi.patch(this,noteId,change);
+                    KeptApi.patchIfUnchanged(this,noteId,change,original);
                 } catch(java.io.IOException network) {
                     if(network instanceof KeptApi.ApiException)throw network;
                     PendingSync.edit(this,noteId,change,original);
