@@ -268,7 +268,16 @@ public class NoteEditorActivity extends Activity {
             : existing.optLong("id", ITEM_IDS.incrementAndGet());
         ItemRow row = new ItemRow(checked, edit, id, existing);
 
-        // Both a soft keyboard "Next" action and a physical Enter key add a new row.
+        // Physical/Bluetooth keyboards deliver Enter as a key event. Handle it
+        // before TextView's default newline/focus-navigation behavior.
+        edit.setOnKeyListener((v, keyCode, event) -> {
+            if (keyCode != KeyEvent.KEYCODE_ENTER || event.isShiftPressed()) return false;
+            if (event.getAction() == KeyEvent.ACTION_DOWN && event.getRepeatCount() == 0)
+                insertNextRow(row);
+            return true;
+        });
+
+        // Soft keyboards usually send IME_ACTION_NEXT without a KeyEvent.
         edit.setOnEditorActionListener((v, actionId, event) -> {
             if (event != null) {
                 if (event.getKeyCode() != KeyEvent.KEYCODE_ENTER || event.isShiftPressed())
@@ -280,7 +289,8 @@ public class NoteEditorActivity extends Activity {
             if (actionId == EditorInfo.IME_ACTION_NEXT ||
                 actionId == EditorInfo.IME_ACTION_DONE ||
                 actionId == EditorInfo.IME_ACTION_GO ||
-                actionId == EditorInfo.IME_ACTION_UNSPECIFIED) {
+                actionId == EditorInfo.IME_ACTION_UNSPECIFIED ||
+                actionId == EditorInfo.IME_NULL) {
                 insertNextRow(row);
                 return true;
             }
