@@ -14,6 +14,8 @@ import android.widget.EditText;
 import android.widget.LinearLayout;
 import android.widget.TextView;
 import android.widget.Toast;
+import android.graphics.Color;
+import android.graphics.drawable.GradientDrawable;
 
 import org.json.JSONArray;
 import org.json.JSONObject;
@@ -35,7 +37,11 @@ public class NoteEditorActivity extends Activity {
     private EditText title, body;
     private TextView status;
     private LinearLayout itemHost;
-    private Button save, addItem;
+    private Button save, addItem, colorButton, labelsButton;
+    private CheckBox pinned;
+    private boolean colorTouched = false, labelsTouched = false;
+    private String selectedColor = "#FFFFFF";
+    private JSONArray chosenLabels = new JSONArray();
     private boolean saving;
 
     private static final class ItemRow {
@@ -78,9 +84,43 @@ public class NoteEditorActivity extends Activity {
         addItem = ScreenUi.button(this, "+ Add checklist item", false);
         root.addView(addItem, ScreenUi.margins(this,0,0,0,14));
         addItem.setOnClickListener(v -> addRow(null));
+
+        pinned = new CheckBox(this);
+        pinned.setText("Pin this note");
+        pinned.setTextSize(16);
+        root.addView(pinned, ScreenUi.margins(this,0,0,0,8));
+
+        LinearLayout actions = new LinearLayout(this);
+        actions.setOrientation(LinearLayout.HORIZONTAL);
+        root.addView(actions, ScreenUi.margins(this,0,0,0,12));
+        colorButton = ScreenUi.button(this, "🎨 Color", false);
+        actions.addView(colorButton, new LinearLayout.LayoutParams(0,ScreenUi.dp(this,48),1f));
+        colorButton.setOnClickListener(v -> pickColor());
+        labelsButton = ScreenUi.button(this, "🏷 Labels", false);
+        LinearLayout.LayoutParams labelParams = new LinearLayout.LayoutParams(0,ScreenUi.dp(this,48),1f);
+        labelParams.leftMargin = ScreenUi.dp(this,8);
+        actions.addView(labelsButton,labelParams);
+        labelsButton.setOnClickListener(v -> pickLabels());
+
         save = ScreenUi.button(this, "Save to Kept", true);
         root.addView(save, ScreenUi.margins(this,0,0,0,10));
         save.setOnClickListener(v -> submit());
+        if (noteId > 0) {
+            Button archive = ScreenUi.button(this,"Archive this note",false);
+            root.addView(archive,ScreenUi.margins(this,0,0,0,10));
+            archive.setOnClickListener(v -> new AlertDialog.Builder(this)
+                .setMessage("Archive this note in Kept?")
+                .setNegativeButton("Cancel",null)
+                .setPositiveButton("Archive",(d,w)->changeLifecycle("archived"))
+                .show());
+            Button trash = ScreenUi.button(this,"Move note to trash",false);
+            root.addView(trash,ScreenUi.margins(this,0,0,0,10));
+            trash.setOnClickListener(v -> new AlertDialog.Builder(this)
+                .setMessage("Move this note to trash? You can restore it from Kept later.")
+                .setNegativeButton("Cancel",null)
+                .setPositiveButton("Trash",(d,w)->changeLifecycle("trashed"))
+                .show());
+        }
         Button browser = ScreenUi.button(this, "Open full Kept web editor", false);
         root.addView(browser, ScreenUi.margins(this,0,0,0,10));
         browser.setOnClickListener(v -> startActivity(new Intent(Intent.ACTION_VIEW,
@@ -108,6 +148,11 @@ public class NoteEditorActivity extends Activity {
                     original = note;
                     isChecklist = note.optBoolean("isCbox");
                     title.setText(KeptApi.plain(note.optString("noteTitle")));
+                    pinned.setChecked(note.optBoolean("pinned"));
+                    chosenLabels = note.optJSONArray("labels");
+                    if (chosenLabels == null) chosenLabels = new JSONArray();
+                    String existingColor = note.optString("bgColor","#FFFFFF");
+                    selectedColor = existingColor.isEmpty() ? "#FFFFFF" : existingColor;
                     body.setText(KeptApi.plain(note.optString("noteBody")));
                     if (note.optBoolean("locked") && !note.optBoolean("lockedContentAvailable", false)) {
                         status.setText("Locked notes must be edited through Kept.");
@@ -122,6 +167,7 @@ public class NoteEditorActivity extends Activity {
                         if (entry != null) addRow(entry);
                     }
                     status.setText(isChecklist ? "Tap checkboxes to complete items.": "Edit your note below.");
+                    labelsButton.setText("🏷 Labels (" + chosenLabels.length() + ")");
                     updateType();
                 });
             } catch (Exception e) {
@@ -207,7 +253,9 @@ public class NoteEditorActivity extends Activity {
                     payload.put("checkBoxes", checks);
                     payload.put("isCbox", isChecklist);
                     payload.put("images", new JSONArray());
-                    payload.put("labels", new JSONArray());
+                    payload.put("labels", chosenLabels);
+                    payload.put("pinned", pinned.isChecked());
+                    if (colorTouched) payload.put("bgColor",selectedColor);
                     KeptApi.add(this, payload);
                 } else {
                     if (!titleText.equals(KeptApi.plain(before.optString("noteTitle"))))
@@ -219,6 +267,10 @@ public class NoteEditorActivity extends Activity {
                     } else if (!bodyText.equals(KeptApi.plain(before.optString("noteBody")))) {
                         payload.put("noteBody", KeptApi.toHtml(bodyText));
                     }
+                    if (pinned.isChecked() != before.optBoolean("pinned"))
+                        payload.put("pinned",pinned.isChecked());
+                    if (colorTouched) payload.put("bgColor",selectedColor);
+                    if (labelsTouched) payload.put("labels",chosenLabels);
                     if (payload.length() != 0) KeptApi.patch(this, id, payload);
                 }
                 CollectionWidgetProvider.refreshAll(this);
@@ -235,4 +287,82 @@ public class NoteEditorActivity extends Activity {
             }
         });
     }
+    private void pickColor() {
+        final String[] names = {"Default","Red","Orange","Yellow","Green","Blue","Lavender","Pink","Gray"};
+        final String[] values = {"#FFFFFF","#FADBD8","#FCE5CA","#FFF3BC","#DBEBD3",
+            "#D6EAF6","#E8DDF6","#F6DAE6","#E8E8E8"};
+        new AlertDialog.Builder(this).setTitle("Note color")
+            .setItems(names,(dialog,index)-> {
+                selectedColor=values[index];
+                colorTouched=true;
+                colorButton.setText("🎨 " + names[index]);
+            }).show();
+    }
+
+    private void pickLabels() {
+        labelsButton.setEnabled(false);
+        Executors.newSingleThreadExecutor().execute(()-> {
+            try {
+                JSONArray catalog=KeptApi.labels(this);
+                java.util.ArrayList<JSONObject> available=new java.util.ArrayList<>();
+                java.util.ArrayList<String> names=new java.util.ArrayList<>();
+                for(int i=0;i<catalog.length();i++){
+                    JSONObject label=catalog.optJSONObject(i);
+                    if(label!=null && !label.optString("name").isEmpty()){
+                        available.add(label);
+                        names.add(label.optString("name"));
+                    }
+                }
+                boolean[] selected=new boolean[available.size()];
+                for(int i=0;i<available.size();i++){
+                    long id=available.get(i).optLong("id",-1);
+                    for(int j=0;j<chosenLabels.length();j++) {
+                        JSONObject existing=chosenLabels.optJSONObject(j);
+                        if(existing!=null && existing.optLong("id",-2)==id) selected[i]=true;
+                    }
+                }
+                runOnUiThread(()-> {
+                    labelsButton.setEnabled(true);
+                    new AlertDialog.Builder(this).setTitle("Labels")
+                        .setMultiChoiceItems(names.toArray(new String[0]),selected,
+                            (dialog,index,checked)->selected[index]=checked)
+                        .setNegativeButton("Cancel",null)
+                        .setPositiveButton("Apply",(dialog,which)-> {
+                            JSONArray result=new JSONArray();
+                            for(int i=0;i<available.size();i++)if(selected[i])result.put(available.get(i));
+                            chosenLabels=result;
+                            labelsTouched=true;
+                            labelsButton.setText("🏷 Labels (" + chosenLabels.length() + ")");
+                        }).show();
+                });
+            } catch(Exception e) {
+                runOnUiThread(()->{
+                    labelsButton.setEnabled(true);
+                    status.setText("Can't load labels: " + e.getMessage());
+                });
+            }
+        });
+    }
+
+    private void changeLifecycle(String field) {
+        if (saving || original == null) return;
+        saving = true;
+        save.setEnabled(false);
+        status.setText("Updating Kept…");
+        Executors.newSingleThreadExecutor().execute(()-> {
+            try {
+                JSONObject change=new JSONObject().put(field,true);
+                KeptApi.patch(this,noteId,change);
+                CollectionWidgetProvider.refreshAll(this);
+                runOnUiThread(()->finish());
+            } catch(Exception e) {
+                runOnUiThread(()->{
+                    saving=false;
+                    save.setEnabled(true);
+                    status.setText("Could not update note: " + e.getMessage());
+                });
+            }
+        });
+    }
+
 }
