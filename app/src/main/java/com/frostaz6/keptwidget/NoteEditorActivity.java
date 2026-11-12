@@ -281,7 +281,18 @@ public class NoteEditorActivity extends Activity {
                     payload.put("labels", chosenLabels);
                     payload.put("pinned", pinned.isChecked());
                     if (colorTouched) payload.put("bgColor",selectedColor);
-                    KeptApi.add(this, payload);
+                    payload.put("syncId","keptwidget-"+java.util.UUID.randomUUID());
+                    try {
+                        KeptApi.add(this,payload);
+                    } catch(java.io.IOException network) {
+                        if(network instanceof KeptApi.ApiException)throw network;
+                        PendingSync.create(this,payload);
+                        runOnUiThread(()->{
+                            Toast.makeText(this,"Saved offline • will sync when online",Toast.LENGTH_LONG).show();
+                            finish();
+                        });
+                        return;
+                    }
                 } else {
                     if (!titleText.equals(KeptApi.plain(before.optString("noteTitle"))))
                         payload.put("noteTitle", titleText);
@@ -296,7 +307,19 @@ public class NoteEditorActivity extends Activity {
                         payload.put("pinned",pinned.isChecked());
                     if (colorTouched) payload.put("bgColor",selectedColor);
                     if (labelsTouched) payload.put("labels",chosenLabels);
-                    if (payload.length() != 0) KeptApi.patch(this, id, payload);
+                    if (payload.length() != 0) {
+                        try {
+                            KeptApi.patch(this,id,payload);
+                        }catch(java.io.IOException network){
+                            if(network instanceof KeptApi.ApiException)throw network;
+                            PendingSync.edit(this,id,payload,before);
+                            runOnUiThread(()->{
+                                Toast.makeText(this,"Edit queued offline • sync resumes automatically",Toast.LENGTH_LONG).show();
+                                finish();
+                            });
+                            return;
+                        }
+                    }
                 }
                 CollectionWidgetProvider.refreshAll(this);
                 runOnUiThread(() -> {
@@ -377,7 +400,12 @@ public class NoteEditorActivity extends Activity {
         Executors.newSingleThreadExecutor().execute(()-> {
             try {
                 JSONObject change=new JSONObject().put(field,true);
-                KeptApi.patch(this,noteId,change);
+                try {
+                    KeptApi.patch(this,noteId,change);
+                } catch(java.io.IOException network) {
+                    if(network instanceof KeptApi.ApiException)throw network;
+                    PendingSync.edit(this,noteId,change,original);
+                }
                 CollectionWidgetProvider.refreshAll(this);
                 runOnUiThread(()->finish());
             } catch(Exception e) {
