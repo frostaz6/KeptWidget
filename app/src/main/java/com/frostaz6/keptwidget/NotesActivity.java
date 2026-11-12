@@ -91,6 +91,10 @@ public final class NotesActivity extends Activity {
         Button refresh = small("↻");
         top.addView(refresh);
         refresh.setOnClickListener(v -> refresh());
+        Button pendingButton=small("⇅");
+        pendingButton.setContentDescription("Offline sync status");
+        top.addView(pendingButton);
+        pendingButton.setOnClickListener(v->startActivity(new Intent(this,SyncStatusActivity.class)));
         Button settings = small("⚙");
         top.addView(settings);
         settings.setOnClickListener(v -> startActivity(new Intent(this, WidgetSettingsActivity.class)));
