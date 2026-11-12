@@ -41,6 +41,8 @@ final class SecureStore {
 
     static String token(Context c) { return read(c, "token"); }
     static void saveToken(Context c, String value) { write(c, "token", value); }
+    static String accountName(Context c) { return read(c,"account_name"); }
+    static void saveAccountName(Context c,String account) { write(c,"account_name",account); }
     static String cachedNotes(Context c) { return read(c, "notes"); }
     static void saveNotes(Context c, String value) { write(c, "notes", value); }
     static String readPending(Context c) { return read(c,"pending"); }
