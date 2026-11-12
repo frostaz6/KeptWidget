@@ -34,7 +34,7 @@ public final class ChecklistKeyboardTest {
 
     @Test public void enterWithSelectedTextReplacesSelectionWithItemBoundary() {
         NoteEditorActivity.TextSplit split =
-            NoteEditorActivity.splitChecklistText("Buy old milk",4,8);
+            NoteEditorActivity.splitChecklistText("Buy old milk",4,7);
         assertEquals("Buy ",split.first);
         assertEquals(" milk",split.second);
     }
