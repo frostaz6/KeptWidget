@@ -28,6 +28,8 @@ import java.util.concurrent.atomic.AtomicLong;
 public class NoteEditorActivity extends Activity {
     public static final String EXTRA_ID = "note_id";
     public static final String EXTRA_LIST = "make_list";
+    public static final String EXTRA_INITIAL_TITLE = "initial_title";
+    public static final String EXTRA_INITIAL_BODY = "initial_body";
     private static final AtomicLong ITEM_IDS = new AtomicLong(System.currentTimeMillis());
 
     private final List<ItemRow> items = new ArrayList<>();
@@ -129,7 +131,11 @@ public class NoteEditorActivity extends Activity {
         root.addView(cancel, ScreenUi.margins(this,0,0,0,8));
         cancel.setOnClickListener(v -> finish());
         if (noteId > 0) load();
-        else updateType();
+        else {
+            title.setText(getIntent().getStringExtra(EXTRA_INITIAL_TITLE));
+            body.setText(getIntent().getStringExtra(EXTRA_INITIAL_BODY));
+            updateType();
+        }
     }
 
     private void updateType() {
