@@ -1,57 +1,90 @@
 # KeptWidget
 
-Native Android home-screen widgets for self-hosted [Kept](https://github.com/ericerkz/kept). Inspired by Google Keep's note collection and quick-capture widgets. Not affiliated with Google or Kept.
+Open-source, widget-first Android client for your own [Kept](https://github.com/ericerkz/kept) server. Inspired by Google Keep, not affiliated with Google or Kept.
 
-## Features
+## Features — v0.2.0
 
-- **Note collection widget:** Resizable, scrollable cards with titles, text previews, pinned indicators and up to three checklist lines. Tap a card to edit; tap a checkbox row to toggle its completion.
-- **Quick capture widget:** Compact new-note and new-checklist shortcuts.
-- Filters for **all notes**, **pinned notes**, or a **specific label**, configurable separately on each widget.
-- Manual refresh and automatic widget updates (~30 minutes, at Android's discretion).
-- Encrypted offline snapshot for viewing notes when the network is unavailable. Changes require a connection.
-- Native note and checklist editor, including a warning before replacing rich-text formatting.
+**Home-screen widgets:**
+- **Note collection:** Resizable, scrolling list of cards, note titles, previews, checklist rows and pinned badges; tap notes to edit or tap checkboxes to complete items.
+- **Single note:** Select a note or checklist when adding the widget; its contents scroll directly on the home screen. Complete checklist items without opening the editor.
+- **Quick capture:** Compact shortcuts for a new text note or checklist.
+- Choose **all notes**, **pinned**, or an individual **label** per collection widget.
+- Manual refresh plus Android-scheduled updates (nominally every 30 minutes; Android may delay them). Encrypted offline snapshots keep previously loaded notes visible.
 
-## Download and install
+**Android app:**
+- Native two-column notes grid (three columns on wider Fold/tablet displays), search, all/pinned/checklist/label filters, and note preview colors.
+- Create/edit text notes and checklists, mark items done, reorder by editing rows, add/remove items.
+- Pin/unpin, set note background color, assign one or multiple labels, archive and move notes to Kept's trash.
+- **Share text from other Android apps:** use Android's Share action → Kept Widget to open a prefilled note for review.
+- Login to your Kept server using username/password with optional TOTP; session and note caches encrypted with Android Keystore.
+- Opens the full Kept web editor for advanced features.
 
-1. Open the [Android APK workflow](../../actions/workflows/android.yml).
-2. Open the latest successful run on the main branch.
-3. Download the KeptWidget-debug-apk artifact and unzip it.
-4. Install app-debug.apk on your Android phone.
-5. Launch Kept Widget and sign in using your Kept HTTPS URL, username, password, and optional TOTP code.
-6. Tap Add note collection widget, or long-press your Android home screen → Widgets → Kept Widget.
+## Download an APK
 
-**Note about updating:** CI uses Android's default debug signing key, which may change from run to run. Later APKs may require uninstalling earlier debug builds unless you set up persistent release signing. Do not put keys or tokens into the public repository.
+1. Open [Actions → Android APK](../../actions/workflows/android.yml).
+2. Open the latest successful run on **main**.
+3. Prefer the **KeptWidget-0.2.0-signed-APK** artifact if available. This is the upgrade-stable version. If that artifact is missing, only a testing/debug APK is configured.
+4. Unzip the artifact, then install `app-release.apk` (or `app-debug.apk` for testing).
+5. Launch Kept Widget and sign in with your HTTPS server URL, e.g. `https://kept.mcnannay.com`.
+6. From your Android home screen, long-press → Widgets → **Kept Widget** and choose the collection, single-note, or quick-capture widget. You can configure several independently.
 
-## Authentication and security
+**Important upgrade rule:** Android only upgrades apps with the same application ID and signing key. Earlier CI-generated debug APKs used ephemeral keys and **cannot be upgraded to the new stable release**. Uninstall the debug APK once, install the stable release APK, then future stable releases signed with that exact keystore can update in place. Back up any local-only data before uninstalling; Kept server notes remain on your server.
 
-- Uses Kept's native JSON API (/api/auth/login, /api/notes, /api/labels), **not** a paid Android client or MetaMCP.
-- Passwords are used for login only and not stored.
-- The session token and offline note cache are encrypted using Android Keystore AES-256-GCM.
-- HTTPS is mandatory. Cross-host redirects are disabled when sending bearer tokens.
-- Changing server URL or signing out removes the stored token and cached notes.
-- Supports username/password and optional TOTP. OIDC-only sign-in is not supported yet.
-- The app has no analytics or ad SDKs.
+## Persistent release signing (required once)
 
-## Scope and limitations
+The GitHub Actions workflow builds an unsigned/debug APK for testing on every push. If both repository secrets below are set on the default branch, it ALSO creates a persistently signed release APK.
 
-This is a widget-first client, not a full reimplementation of Kept's Android app. Note/checklist editing and checkbox toggling are provided. Rich text, images, drawings, reminders, shared-note administration, and locked-note editing should be done in the full Kept web UI through the app's shortcut. Note colors are not yet rendered per-note in the collection. Device behavior can depend on launcher; CI compilation alone is not an on-device test.
+Go to **Settings → Secrets and variables → Actions → New repository secret** and add:
+
+- `KEPTWIDGET_KEYSTORE_B64`: base64-encoded contents of the **private** JKS keystore.
+- `KEPTWIDGET_KEYSTORE_PASSWORD`: the JKS store/key password.
+
+The keystore **must** contain a key with alias `keptwidget`. Do not commit the JKS or the secrets to this public repository. Keep an independent secure backup of the keystore and password, as losing them makes in-place updates impossible.
+
+For this owner's installation, the encrypted signing backup bundle with the initial keystore and secret values was delivered privately in the associated ChatGPT conversation. The ZIP is **not stored in this repository**. Extract its `github-actions-secrets.txt`, copy each value to the corresponding GitHub repository secret, then delete the plaintext file from your machine when done. Keep the JKS backup securely.
+
+Once secrets are configured, run the workflow manually (Actions → Android APK → Run workflow), and download the **signed** APK artifact. Future release builds should keep using the same signing key.
+
+## Security
+
+- Kept session token and offline note previews are encrypted using AES-256-GCM through Android Keystore.
+- No hardcoded Kept credentials, tokens, or host-specific secrets in source. The initial server URL is just a default and can be changed.
+- HTTPS is required, redirects are disabled for authenticated requests, and no external analytics/ad SDKs are included.
+- Password is only used for login. Changing server or signing out clears stored credentials and cached content.
+- Auth supports Kept's native password + TOTP login; **OIDC-only sign-in is not supported**.
+- The widget uses Kept's authenticated REST API, not the MCP endpoint. No paid Kept Android app, API key, or MetaMCP connection is needed.
+
+## Limitations
+
+This is an independently implemented **Google Keep-style widget and basic notes client**, not a complete 1:1 replacement for every Google Keep/Kept app feature.
+
+- Images, drawings, reminders, rich text authoring, collaboration controls, and locked-note editing still require Kept's web editor.
+- Body editing converts the plain text field to HTML on save; if rich formatting would be lost, the editor warns before saving.
+- Offline notes display from encrypted cache, but changes are only sent when online; there is currently **no queued offline write sync**.
+- Widget behavior depends on Android launchers, and the project has been compiled in GitHub Actions but still requires device testing.
+- Debug builds are not update-stable. Use the signed release artifact after configuring GitHub secrets.
+- Keep upgrading the server if its API changes; this project uses supported native API endpoints but is maintained independently.
 
 ## Local build
 
-Install Android SDK Platform 35, JDK 17, and Gradle 8.10.2, then run:
+Requires JDK 17, Android SDK Platform/Build Tools 35, Gradle 8.10.2.
 
-    gradle :app:assembleDebug
+```bash
+gradle :app:assembleDebug
+```
 
-Output: app/build/outputs/apk/debug/app-debug.apk.
+Produces `app/build/outputs/apk/debug/app-debug.apk`. For a release, configure environment variables `ANDROID_RELEASE_KEYSTORE` and `ANDROID_RELEASE_PASSWORD` for the permanent JKS, then run `gradle :app:assembleRelease`.
 
-## Source map
+## Key source files
 
-- KeptApi.java: REST client (including PATCH requests and checklist mutations)
-- SecureStore.java: Android Keystore encrypted session and cached note cards
-- NoteRemoteViewsService.java: scrollable widget note cards
-- CollectionWidgetProvider.java / CaptureWidgetProvider.java: widget layouts and refresh
-- WidgetActionReceiver.java: widget actions and checkbox toggles
-- WidgetConfigActivity.java: all / pinned / label widget filter
-- LoginActivity.java: self-hosted server sign-in
-- NoteEditorActivity.java: notes and checklist editing
-- .github/workflows/android.yml: build APK using GitHub Actions
+- `KeptApi.java`: Kept REST integration, writes, and checklist item toggles
+- `SecureStore.java`: encrypted session and note snapshots
+- `NotesActivity.java`: native notes home screen, search, filters, and card actions
+- `NoteEditorActivity.java`: note/checklist editor and organization
+- `NoteRemoteViewsService.java`: scrolling collection widget
+- `SingleNoteRemoteViewsService.java`: scrolling single-note widget
+- `CollectionWidgetProvider.java`, `SingleNoteWidgetProvider.java`, `CaptureWidgetProvider.java`: widget providers
+- `WidgetRouterActivity.java`: Android-safe widget click dispatcher
+- `WidgetConfigActivity.java`, `SingleNoteConfigActivity.java`: widget configuration
+- `ShareReceiverActivity.java`: Android share target
+- `.github/workflows/android.yml`: GitHub build, debug APK, and stable signing workflow
