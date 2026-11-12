@@ -43,6 +43,8 @@ final class SecureStore {
     static void saveToken(Context c, String value) { write(c, "token", value); }
     static String cachedNotes(Context c) { return read(c, "notes"); }
     static void saveNotes(Context c, String value) { write(c, "notes", value); }
+    static String singleNote(Context c, long id) { return read(c, "single_" + id); }
+    static void saveSingleNote(Context c, long id, String value) { write(c, "single_" + id, value); }
 
     static void clear(Context c) {
         c.getApplicationContext().getSharedPreferences(PRIVATE_PREFS, Context.MODE_PRIVATE)
