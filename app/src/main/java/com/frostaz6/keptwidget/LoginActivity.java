@@ -118,6 +118,10 @@ public class LoginActivity extends Activity {
             status.setText("Enter your Kept username and password.");
             return;
         }
+        if(PendingSync.count(this)>0 && !url.equals(SecureStore.baseUrl(this))) {
+            status.setText("There are unsynced edits on the current server. Sync or discard them before switching servers.");
+            return;
+        }
         String previousAccount=SecureStore.accountName(this);
         if(PendingSync.count(this)>0 && !previousAccount.isEmpty()
             && !previousAccount.equalsIgnoreCase(user)) {
