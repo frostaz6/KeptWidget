@@ -31,6 +31,14 @@ public class WidgetRouterActivity extends Activity {
                 String problem = null;
                 try {
                     KeptApi.toggleCheckbox(this, id, itemId);
+                } catch (java.io.IOException e) {
+                    if(!(e instanceof KeptApi.ApiException)) {
+                        try {
+                            if(PendingSync.checkbox(this,id,itemId)) {
+                                problem="Saved offline • will sync automatically";
+                            } else problem="Can't queue offline: note wasn't cached. Open it once online.";
+                        }catch(Exception queued){problem=queued.getMessage();}
+                    }else problem=e.getMessage();
                 } catch (Exception e) {
                     problem = e.getMessage();
                 }
