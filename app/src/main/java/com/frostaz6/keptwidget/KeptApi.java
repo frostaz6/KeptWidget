@@ -115,6 +115,21 @@ final class KeptApi {
         return Html.fromHtml(html, Html.FROM_HTML_MODE_COMPACT).toString().trim();
     }
 
+    /**
+     * Card previewText is a collapsed search summary. noteBody is Kept's formatted
+     * source; preserve its block elements, explicit breaks and embedded newlines.
+     */
+    static String formatted(String html) {
+        if (html == null || html.isEmpty()) return "";
+        String value = html.replace("\r\n", "\n").replace('\r','\n');
+        boolean hasHtmlBlocks = java.util.regex.Pattern.compile(
+            "<\\s*(?:br|p|div|li|ul|ol|h[1-6]|pre|blockquote)\\b",
+            java.util.regex.Pattern.CASE_INSENSITIVE).matcher(value).find();
+        if (!hasHtmlBlocks) value = value.replace("\n", "<br>");
+        return Html.fromHtml(value, Html.FROM_HTML_MODE_COMPACT).toString()
+            .replace('\u00a0',' ').replaceAll("\\n{4,}", "\n\n\n").trim();
+    }
+
     static String toHtml(String text) {
         String value = text == null ? "" : text;
         return value.replace("&", "&amp;").replace("<", "&lt;")
