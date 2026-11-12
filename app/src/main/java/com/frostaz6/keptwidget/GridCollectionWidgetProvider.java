@@ -47,7 +47,7 @@ public final class GridCollectionWidgetProvider extends AppWidgetProvider {
 
     @Override public void onDeleted(Context context,int[] ids){
         for(int id:ids) {
-            SecureStore.preferences(context).edit().remove("filter_"+id).remove("title_"+id).apply();
+            SecureStore.preferences(context).edit().remove("filter_"+id).remove("title_"+id).remove("sort_"+id).apply();
             WidgetAppearance.clear(context,id);
         }
     }
