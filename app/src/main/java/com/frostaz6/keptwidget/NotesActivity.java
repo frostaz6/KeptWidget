@@ -32,7 +32,7 @@ import java.util.concurrent.Executors;
 
 /** Notes home screen. All UI renders on main thread; networking runs on a single executor. */
 public final class NotesActivity extends Activity {
-    private static final int BG = 0xfff7f6f0;
+    private static final int BG = 0xff16191a;
     private final ExecutorService io = Executors.newSingleThreadExecutor();
     private final ArrayList<JSONObject> notes = new ArrayList<>();
     private final ArrayList<JSONObject> labels = new ArrayList<>();
@@ -85,7 +85,7 @@ public final class NotesActivity extends Activity {
         top.setGravity(Gravity.CENTER_VERTICAL);
         root.addView(top);
         TextView brand = ScreenUi.label(this, "Kept", 30, true);
-        brand.setTextColor(0xff354c27);
+        brand.setTextColor(0xffc5ed9a);
         top.addView(brand, new LinearLayout.LayoutParams(0, -2, 1));
         Button refresh = small("↻");
         top.addView(refresh);
@@ -96,7 +96,7 @@ public final class NotesActivity extends Activity {
 
         search = ScreenUi.field(this, "⌕  Search notes", android.text.InputType.TYPE_CLASS_TEXT);
         search.setSingleLine(true);
-        GradientDrawable searchBg = shape(0xffffffff, 16, 0xffe9e8e2);
+        GradientDrawable searchBg = shape(0xff292f2e, 16, 0xff444d46);
         search.setBackground(searchBg);
         search.setPadding(d(15), d(12), d(15), d(12));
         root.addView(search, ScreenUi.margins(this,0,14,0,12));
@@ -297,12 +297,12 @@ public final class NotesActivity extends Activity {
         LinearLayout card = new LinearLayout(this);
         card.setOrientation(LinearLayout.VERTICAL);
         card.setPadding(d(12), d(13), d(12), d(11));
-        int color = 0xffffffff;
+        int color = 0xff303338;
         try {
             String raw=note.optString("bgColor","");
-            if(raw.startsWith("#")) color=Color.parseColor(raw);
+            if(raw.startsWith("#")) color=WidgetAppearance.noteColor(raw,true);
         } catch (IllegalArgumentException ignored) { }
-        card.setBackground(shape(color, 16, 0xffe1e0d7));
+        card.setBackground(shape(color, 16, 0xff515652));
         card.setElevation(d(1));
         String title = KeptApi.plain(note.optString("noteTitle"));
         boolean locked = note.optBoolean("locked") && !note.optBoolean("lockedContentAvailable", false);
