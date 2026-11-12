@@ -12,7 +12,7 @@ public class CaptureWidgetProvider extends AppWidgetProvider {
         for (int id : ids) {
             RemoteViews views = new RemoteViews(context.getPackageName(), R.layout.widget_capture);
             views.setOnClickPendingIntent(R.id.capture_open, PendingIntent.getActivity(context, id,
-                new Intent(context, LoginActivity.class),
+                new Intent(context, NotesActivity.class),
                 PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE));
             views.setOnClickPendingIntent(R.id.capture_note,
                 CollectionWidgetProvider.editor(context, id * 10 + 4, false));
