@@ -21,6 +21,12 @@ public final class SingleNoteWidgetProvider extends AppWidgetProvider {
     static void render(Context context, AppWidgetManager manager, int id) {
         long noteId=SecureStore.preferences(context).getLong("single_note_"+id,-1L);
         RemoteViews views=new RemoteViews(context.getPackageName(),R.layout.widget_single);
+        WidgetAppearance.applyBackground(context,views,R.id.single_root,id);
+        boolean dark=WidgetAppearance.dark(context,id);
+        views.setTextColor(R.id.single_title,WidgetAppearance.text(dark));
+        views.setTextColor(R.id.single_edit,WidgetAppearance.accent(dark));
+        views.setTextColor(R.id.single_refresh,WidgetAppearance.muted(dark));
+        views.setTextColor(R.id.single_empty,WidgetAppearance.muted(dark));
         if(noteId>0){
             try {
                 String cached=SecureStore.singleNote(context,noteId);
@@ -73,6 +79,9 @@ public final class SingleNoteWidgetProvider extends AppWidgetProvider {
     }
 
     @Override public void onDeleted(Context context,int[] ids) {
-        for(int id:ids) SecureStore.preferences(context).edit().remove("single_note_"+id).apply();
+        for(int id:ids) {
+            SecureStore.preferences(context).edit().remove("single_note_"+id).apply();
+            WidgetAppearance.clear(context,id);
+        }
     }
 }
