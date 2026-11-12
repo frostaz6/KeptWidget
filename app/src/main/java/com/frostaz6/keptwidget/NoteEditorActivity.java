@@ -146,40 +146,59 @@ public class NoteEditorActivity extends Activity {
     }
 
     private void load() {
-        long id = noteId;
-        Executors.newSingleThreadExecutor().execute(() -> {
+        long id=noteId;
+        Executors.newSingleThreadExecutor().execute(()->{
             try {
-                JSONObject note = KeptApi.note(this, id);
-                runOnUiThread(() -> {
-                    original = note;
-                    isChecklist = note.optBoolean("isCbox");
-                    title.setText(KeptApi.plain(note.optString("noteTitle")));
-                    pinned.setChecked(note.optBoolean("pinned"));
-                    chosenLabels = note.optJSONArray("labels");
-                    if (chosenLabels == null) chosenLabels = new JSONArray();
-                    String existingColor = note.optString("bgColor","#FFFFFF");
-                    selectedColor = existingColor.isEmpty() ? "#FFFFFF" : existingColor;
-                    body.setText(KeptApi.plain(note.optString("noteBody")));
-                    if (note.optBoolean("locked") && !note.optBoolean("lockedContentAvailable", false)) {
-                        status.setText("Locked notes must be edited through Kept.");
-                        save.setEnabled(false);
+                JSONObject note=KeptApi.note(this,id);
+                SecureStore.saveSingleNote(this,id,note.toString());
+                runOnUiThread(()->displayNote(note,false));
+            } catch(Exception ex) {
+                // Only full-note snapshots are safe for offline edits. Card previews
+                // truncate checklists and must never be saved as whole notes.
+                String raw=SecureStore.singleNote(this,id);
+                if(!raw.isBlank()) {
+                    try {
+                        JSONObject cached=new JSONObject(raw);
+                        JSONArray overlay=PendingSync.overlay(this,new JSONArray().put(cached));
+                        JSONObject note=overlay.optJSONObject(0);
+                        runOnUiThread(()->displayNote(note,true));
                         return;
-                    }
-                    items.clear();
-                    itemHost.removeAllViews();
-                    JSONArray checks = note.optJSONArray("checkBoxes");
-                    if (checks != null) for (int i = 0; i < checks.length(); i++) {
-                        JSONObject entry = checks.optJSONObject(i);
-                        if (entry != null) addRow(entry);
-                    }
-                    status.setText(isChecklist ? "Tap checkboxes to complete items.": "Edit your note below.");
-                    labelsButton.setText("🏷 Labels (" + chosenLabels.length() + ")");
-                    updateType();
+                    } catch(Exception ignored){}
+                }
+                runOnUiThread(()->{
+                    status.setText("No full offline copy. Open this note once while online to enable offline editing.");
+                    save.setEnabled(false);
                 });
-            } catch (Exception e) {
-                runOnUiThread(() -> { status.setText(e.getMessage()); save.setEnabled(false); });
             }
         });
+    }
+
+    private void displayNote(JSONObject note,boolean offline) {
+        original=note;
+        isChecklist=note.optBoolean("isCbox");
+        title.setText(KeptApi.plain(note.optString("noteTitle")));
+        pinned.setChecked(note.optBoolean("pinned"));
+        chosenLabels=note.optJSONArray("labels");
+        if(chosenLabels==null)chosenLabels=new JSONArray();
+        String color=note.optString("bgColor","#FFFFFF");
+        selectedColor=color.isEmpty()?"#FFFFFF":color;
+        body.setText(KeptApi.formatted(note.optString("noteBody")));
+        if(note.optBoolean("locked")&&!note.optBoolean("lockedContentAvailable",false)){
+            status.setText("Locked notes must be edited in Kept.");
+            save.setEnabled(false);
+            return;
+        }
+        items.clear();
+        itemHost.removeAllViews();
+        JSONArray checks=note.optJSONArray("checkBoxes");
+        if(checks!=null)for(int i=0;i<checks.length();i++){
+            JSONObject entry=checks.optJSONObject(i);
+            if(entry!=null)addRow(entry);
+        }
+        status.setText(offline?"Offline copy • edits will be queued for safe sync":
+            (isChecklist?"Tap checkboxes to complete items.":"Edit your note below."));
+        labelsButton.setText("🏷 Labels ("+chosenLabels.length()+")");
+        updateType();
     }
 
     private void addRow(JSONObject existing) {
