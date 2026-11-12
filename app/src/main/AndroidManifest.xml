@@ -23,6 +23,8 @@
       android:theme="@android:style/Theme.Translucent.NoTitleBar"/>
     <activity android:name=".WidgetConfigActivity" android:exported="true"/>
     <activity android:name=".SingleNoteConfigActivity" android:exported="true"/>
+    <activity android:name=".CaptureWidgetConfigActivity" android:exported="true"/>
+    <activity android:name=".WidgetSettingsActivity" android:exported="false"/>
     <receiver android:name=".CollectionWidgetProvider"
       android:label="@string/collection_widget" android:exported="true">
       <intent-filter><action android:name="android.appwidget.action.APPWIDGET_UPDATE"/></intent-filter>
