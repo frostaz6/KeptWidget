@@ -92,7 +92,7 @@ public final class NotesActivity extends Activity {
         refresh.setOnClickListener(v -> refresh());
         Button settings = small("⚙");
         top.addView(settings);
-        settings.setOnClickListener(v -> startActivity(new Intent(this, LoginActivity.class)));
+        settings.setOnClickListener(v -> startActivity(new Intent(this, WidgetSettingsActivity.class)));
 
         search = ScreenUi.field(this, "⌕  Search notes", android.text.InputType.TYPE_CLASS_TEXT);
         search.setSingleLine(true);
