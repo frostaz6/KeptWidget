@@ -80,7 +80,7 @@ public final class SingleNoteRemoteViewsService extends RemoteViewsService {
             if(checklist)row.setTextViewText(R.id.single_checkbox,done?"☑":"☐");
             row.setTextColor(R.id.single_item_text,done?0xff8a8d88:WidgetAppearance.text(dark));
             row.setTextColor(R.id.single_checkbox,WidgetAppearance.accent(dark));
-            if(!checklist)row.setInt(R.id.single_item_text,"setMaxLines",120);
+
 
             Intent open=new Intent();
             open.putExtra(NoteEditorActivity.EXTRA_ID,noteId);
