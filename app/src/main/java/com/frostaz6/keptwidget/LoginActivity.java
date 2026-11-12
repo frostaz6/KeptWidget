@@ -118,13 +118,23 @@ public class LoginActivity extends Activity {
             status.setText("Enter your Kept username and password.");
             return;
         }
+        String previousAccount=SecureStore.accountName(this);
+        if(PendingSync.count(this)>0 && !previousAccount.isEmpty()
+            && !previousAccount.equalsIgnoreCase(user)) {
+            status.setText("Offline edits belong to "+previousAccount+
+                ". Sync or review them before signing into another account.");
+            return;
+        }
         signIn.setEnabled(false);
         status.setText("Connecting…");
         Executors.newSingleThreadExecutor().execute(() -> {
             try {
                 SecureStore.changeBaseUrl(this, url);
                 String token = KeptApi.login(this, user, pass, code);
+                if(!previousAccount.isEmpty() && !previousAccount.equalsIgnoreCase(user))
+                    SecureStore.clear(this);
                 SecureStore.saveToken(this, token);
+                SecureStore.saveAccountName(this,user);
                 CollectionWidgetProvider.refreshAll(this);
                 runOnUiThread(() -> {
                     password.setText("");
