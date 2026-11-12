@@ -28,6 +28,11 @@
       <intent-filter><action android:name="android.appwidget.action.APPWIDGET_UPDATE"/></intent-filter>
       <meta-data android:name="android.appwidget.provider" android:resource="@xml/collection_widget_info"/>
     </receiver>
+    <receiver android:name=".GridCollectionWidgetProvider"
+      android:label="@string/grid_widget" android:exported="true">
+      <intent-filter><action android:name="android.appwidget.action.APPWIDGET_UPDATE"/></intent-filter>
+      <meta-data android:name="android.appwidget.provider" android:resource="@xml/grid_widget_info"/>
+    </receiver>
     <receiver android:name=".CaptureWidgetProvider"
       android:label="@string/capture_widget" android:exported="true">
       <intent-filter><action android:name="android.appwidget.action.APPWIDGET_UPDATE"/></intent-filter>
