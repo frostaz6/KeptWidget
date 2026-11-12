@@ -80,25 +80,21 @@ public class NoteRemoteViewsService extends RemoteViewsService {
             JSONObject note = notes.get(position);
             RemoteViews row = new RemoteViews(context.getPackageName(), R.layout.widget_note_row);
             String bg = note.optString("bgColor", "");
-            if (Build.VERSION.SDK_INT >= 31 && !bg.isBlank()) {
-                try {
-                    int source = Color.parseColor(bg);
-                    // Keep dark text readable while honoring Kept's note color.
-                    int pastel = Color.rgb((Color.red(source) + 510) / 3,
-                        (Color.green(source) + 510) / 3,
-                        (Color.blue(source) + 510) / 3);
-                    row.setColorStateList(R.id.note_card, "setBackgroundTintList",
-                        ColorStateList.valueOf(pastel));
-                } catch (IllegalArgumentException ignored) { }
-            }
+            WidgetAppearance.applyCard(context,row,R.id.note_card,widgetId,bg);
+            boolean dark=WidgetAppearance.dark(context,widgetId);
+            row.setTextColor(R.id.note_title,WidgetAppearance.text(dark));
+            row.setTextColor(R.id.note_body,WidgetAppearance.text(dark));
+            row.setTextColor(R.id.note_footer,WidgetAppearance.muted(dark));
+
             long noteId = note.optLong("id", -1L);
             boolean locked = note.optBoolean("locked")
                 && !note.optBoolean("lockedContentAvailable", false);
             String title = KeptApi.plain(note.optString("noteTitle"));
-            String body = locked ? "🔒 Locked note" :
-                KeptApi.plain(note.optString("previewText", note.optString("noteBody")));
-            if (title.isEmpty()) title = note.optBoolean("isCbox") ? "Checklist" : "Untitled note";
+            String body = locked ? "🔒 Locked note" : KeptApi.formatted(note.optString("noteBody",""));
+            // A checklist's previewText contains the *same* items again as flattened text.
+            if (note.optBoolean("isCbox") && body.isBlank()) body = "";
             row.setTextViewText(R.id.note_title, title);
+            row.setViewVisibility(R.id.note_title, title.isEmpty() ? View.GONE : View.VISIBLE);
             row.setTextViewText(R.id.note_body, body);
             row.setViewVisibility(R.id.note_body, body.isEmpty() ? View.GONE : View.VISIBLE);
 
@@ -114,13 +110,13 @@ public class NoteRemoteViewsService extends RemoteViewsService {
                 for (int i = 0; i < checks.length() && shown < CHECK_IDS.length; i++) {
                     JSONObject item = checks.optJSONObject(i);
                     if (item == null) continue;
-                    String text = KeptApi.plain(item.optString("data"));
+                    String text = KeptApi.formatted(item.optString("data"));
                     if (text.isBlank()) continue;
                     int resId = CHECK_IDS[shown++];
                     boolean done = item.optBoolean("done");
                     row.setViewVisibility(resId, View.VISIBLE);
                     row.setTextViewText(resId, (done ? "☑   " : "☐   ") + text);
-                    row.setTextColor(resId, done ? 0xff858982 : 0xff394637);
+                    row.setTextColor(resId, done ? (dark ? 0xff9aa296 : 0xff858982) : WidgetAppearance.text(dark));
                     if (noteId > 0) {
                         Intent toggle = new Intent();
                         toggle.putExtra(NoteEditorActivity.EXTRA_ID, noteId);
@@ -135,7 +131,7 @@ public class NoteRemoteViewsService extends RemoteViewsService {
 
             String footer = note.optBoolean("pinned") ? "📌 Pinned" : "";
             if (checks != null && checks.length() > shown)
-                footer += (footer.isEmpty() ? "" : "  ·  ") + "More items…";
+                footer += (footer.isEmpty() ? "" : "  ·  ") + "+" + (checks.length()-shown) + " more shown in editor";
             row.setTextViewText(R.id.note_footer, footer);
             row.setViewVisibility(R.id.note_footer, footer.isEmpty() ? View.GONE : View.VISIBLE);
             return row;
