@@ -2,5 +2,6 @@
   <string name="app_name">Kept Widget</string>
   <string name="collection_widget">Kept note collection</string>
   <string name="capture_widget">Kept quick capture</string>
+  <string name="single_widget">Kept single note</string>
   <string name="widget_empty">No notes yet. Tap + to create one.</string>
 </resources>
