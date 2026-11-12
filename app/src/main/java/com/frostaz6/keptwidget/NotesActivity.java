@@ -59,6 +59,7 @@ public final class NotesActivity extends Activity {
 
     @Override protected void onResume() {
         super.onResume();
+        if(PendingSync.count(this)>0)PendingSync.schedule(this);
         if (root != null && !loading) refresh();
     }
 
@@ -164,7 +165,7 @@ public final class NotesActivity extends Activity {
 
     private void showCached() {
         try {
-            JSONArray data = new JSONArray(SecureStore.cachedNotes(this));
+            JSONArray data = PendingSync.overlay(this,new JSONArray(SecureStore.cachedNotes(this)));
             notes.clear();
             for (int i=0;i<data.length();i++) {
                 JSONObject note = data.optJSONObject(i);
@@ -186,11 +187,12 @@ public final class NotesActivity extends Activity {
                 JSONArray fetched = KeptApi.notes(this);
                 JSONArray allLabels = KeptApi.labels(this);
                 SecureStore.saveNotes(this, fetched.toString());
+                JSONArray showing=PendingSync.overlay(this,fetched);
                 runOnUiThread(() -> {
                     loading = false;
                     notes.clear();
-                    for (int i=0;i<fetched.length();i++) {
-                        JSONObject note = fetched.optJSONObject(i);
+                    for (int i=0;i<showing.length();i++) {
+                        JSONObject note = showing.optJSONObject(i);
                         if (note!=null) notes.add(note);
                     }
                     labels.clear();
@@ -199,7 +201,9 @@ public final class NotesActivity extends Activity {
                         if (label!=null) labels.add(label);
                     }
                     installFilters();
-                    hint.setText(notes.size() + " notes • Synced");
+                    hint.setText(notes.size() + " notes • " +
+                        (PendingSync.count(this)>0?PendingSync.count(this)+" pending edits":
+                            "Synced"));
                     render();
                     CollectionWidgetProvider.refreshAll(this);
                 });
@@ -337,6 +341,11 @@ public final class NotesActivity extends Activity {
                 text.setEllipsize(android.text.TextUtils.TruncateAt.END);
                 card.addView(text,ScreenUi.margins(this,0,8,0,0));
             }
+        }
+        if (note.optBoolean("syncPending")) {
+            TextView queued=ScreenUi.hint(this,note.optBoolean("syncConflict")?
+                "⚠ Sync conflict — tap Sync status" : "⏳ Waiting to sync");
+            card.addView(queued,ScreenUi.margins(this,0,7,0,0));
         }
         if (note.optBoolean("pinned")) {
             TextView pin=ScreenUi.hint(this,"📌 Pinned");
