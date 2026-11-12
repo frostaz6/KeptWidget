@@ -38,6 +38,17 @@ public final class SingleNoteConfigActivity extends Activity {
             "Choose a note or checklist. The widget lets you scroll and check off list items without opening the app."),
             ScreenUi.margins(this,0,0,0,14));
         appearance=WidgetAppearance.controls(this,root,widgetId,false);
+        if (SecureStore.preferences(this).getLong("single_note_"+widgetId,-1L)>0) {
+            Button apply=ScreenUi.button(this,"Save appearance (keep current note)",true);
+            root.addView(apply,ScreenUi.margins(this,0,0,0,18));
+            apply.setOnClickListener(v->{
+                appearance.save();
+                SingleNoteWidgetProvider.render(this,AppWidgetManager.getInstance(this),widgetId);
+                Intent done=new Intent().putExtra(AppWidgetManager.EXTRA_APPWIDGET_ID,widgetId);
+                setResult(RESULT_OK,done);
+                finish();
+            });
+        }
         search=ScreenUi.field(this,"Search your notes",InputType.TYPE_CLASS_TEXT);
         root.addView(search,ScreenUi.margins(this,0,0,0,12));
         hint=ScreenUi.hint(this,"Loading notes…");
