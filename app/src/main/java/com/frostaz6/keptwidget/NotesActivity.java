@@ -386,11 +386,19 @@ public final class NotesActivity extends Activity {
     }
 
     private void update(long id, String key, boolean value) {
+        JSONObject cached=null;
+        for(JSONObject note:notes)if(note.optLong("id",-1)==id){cached=note;break;}
+        final JSONObject original=cached;
+        if(original==null)return;
         io.execute(() -> {
             try {
-                JSONObject patch=new JSONObject();
-                patch.put(key,value);
-                KeptApi.patch(this,id,patch);
+                JSONObject patch=new JSONObject().put(key,value);
+                try {
+                    KeptApi.patchIfUnchanged(this,id,patch,original);
+                }catch(java.io.IOException network){
+                    if(network instanceof KeptApi.ApiException)throw network;
+                    PendingSync.edit(this,id,patch,original);
+                }
                 runOnUiThread(this::refresh);
             } catch(Exception e) {
                 runOnUiThread(() -> Toast.makeText(this,"Could not update note: "+e.getMessage(),
