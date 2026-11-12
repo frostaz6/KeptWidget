@@ -68,6 +68,13 @@ final class KeptApi {
         return all;
     }
 
+    /** For reconnect deduplication, include all notes and stable syncIds. */
+    static JSONArray allNotes(Context c) throws IOException, JSONException {
+        Object result=call(c,"GET","/api/notes",null,requireToken(c));
+        if(!(result instanceof JSONArray))throw new IOException("Unexpected notes response.");
+        return (JSONArray)result;
+    }
+
     static JSONArray labels(Context c) throws IOException, JSONException {
         Object value = call(c, "GET", "/api/labels", null, requireToken(c));
         return value instanceof JSONArray ? (JSONArray) value : new JSONArray();
