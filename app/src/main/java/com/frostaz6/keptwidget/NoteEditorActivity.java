@@ -7,6 +7,8 @@ import android.net.Uri;
 import android.os.Bundle;
 import android.text.InputType;
 import android.view.Gravity;
+import android.view.KeyEvent;
+import android.view.inputmethod.EditorInfo;
 import android.view.View;
 import android.widget.Button;
 import android.widget.CheckBox;
@@ -85,7 +87,7 @@ public class NoteEditorActivity extends Activity {
         root.addView(itemHost, ScreenUi.margins(this,0,0,0,10));
         addItem = ScreenUi.button(this, "+ Add checklist item", false);
         root.addView(addItem, ScreenUi.margins(this,0,0,0,14));
-        addItem.setOnClickListener(v -> addRow(null));
+        addItem.setOnClickListener(v -> insertRow(null, items.size(), true));
 
         pinned = new CheckBox(this);
         pinned.setText("Pin this note");
@@ -201,7 +203,45 @@ public class NoteEditorActivity extends Activity {
         updateType();
     }
 
+    /** Restores an existing checklist item in its original order, without taking focus. */
     private void addRow(JSONObject existing) {
+        insertRow(existing, items.size(), false);
+    }
+
+    /**
+     * Enter is a structural separator in a checklist, not a newline character.
+     * Split at the cursor so typing in the middle of an item behaves like Keep.
+     */
+    static final class TextSplit {
+        final String first;
+        final String second;
+        TextSplit(String first, String second) {
+            this.first = first;
+            this.second = second;
+        }
+    }
+
+    static TextSplit splitChecklistText(String value, int start, int end) {
+        String safe = value == null ? "" : value;
+        int left = Math.max(0, Math.min(start, safe.length()));
+        int right = Math.max(left, Math.min(end, safe.length()));
+        return new TextSplit(safe.substring(0, left), safe.substring(right));
+    }
+
+    private void insertNextRow(ItemRow current) {
+        int index = items.indexOf(current);
+        if (index < 0) return;
+        EditText edit = current.text;
+        TextSplit parts = splitChecklistText(edit.getText().toString(),
+            edit.getSelectionStart(), edit.getSelectionEnd());
+        // Text before the caret stays with the existing item; the rest moves to the new item.
+        edit.setText(parts.first);
+        ItemRow next = insertRow(null, index + 1, true);
+        next.text.setText(parts.second);
+        next.text.setSelection(0);
+    }
+
+    private ItemRow insertRow(JSONObject existing, int index, boolean focus) {
         LinearLayout line = new LinearLayout(this);
         line.setOrientation(LinearLayout.HORIZONTAL);
         line.setGravity(Gravity.CENTER_VERTICAL);
@@ -209,18 +249,66 @@ public class NoteEditorActivity extends Activity {
         checked.setChecked(existing != null && existing.optBoolean("done"));
         line.addView(checked, new LinearLayout.LayoutParams(ScreenUi.dp(this,48),
             LinearLayout.LayoutParams.WRAP_CONTENT));
+
         EditText edit = ScreenUi.field(this, "List item", InputType.TYPE_CLASS_TEXT |
             InputType.TYPE_TEXT_FLAG_CAP_SENTENCES);
+        // ScreenUi.field sets the input type last; enforce single-line behavior
+        // again so Android/Samsung keyboards offer Next rather than Return.
+        edit.setSingleLine(true);
+        edit.setMaxLines(1);
+        edit.setImeOptions(EditorInfo.IME_ACTION_NEXT | EditorInfo.IME_FLAG_NO_EXTRACT_UI);
         edit.setText(existing == null ? "" : KeptApi.plain(existing.optString("data")));
         line.addView(edit, new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f));
+
         Button remove = ScreenUi.button(this, "×", false);
         line.addView(remove, new LinearLayout.LayoutParams(ScreenUi.dp(this,42),
             ScreenUi.dp(this,42)));
-        long id = existing == null ? ITEM_IDS.incrementAndGet() : existing.optLong("id", ITEM_IDS.incrementAndGet());
+
+        long id = existing == null ? ITEM_IDS.incrementAndGet()
+            : existing.optLong("id", ITEM_IDS.incrementAndGet());
         ItemRow row = new ItemRow(checked, edit, id, existing);
-        items.add(row);
-        itemHost.addView(line, ScreenUi.margins(this,0,0,0,6));
-        remove.setOnClickListener(v -> { items.remove(row); itemHost.removeView(line); });
+
+        // Both a soft keyboard "Next" action and a physical Enter key add a new row.
+        edit.setOnEditorActionListener((v, actionId, event) -> {
+            if (event != null) {
+                if (event.getKeyCode() != KeyEvent.KEYCODE_ENTER || event.isShiftPressed())
+                    return false;
+                if (event.getAction() == KeyEvent.ACTION_DOWN && event.getRepeatCount() == 0)
+                    insertNextRow(row);
+                return true; // Consume KEY_UP too; never insert a line break.
+            }
+            if (actionId == EditorInfo.IME_ACTION_NEXT ||
+                actionId == EditorInfo.IME_ACTION_DONE ||
+                actionId == EditorInfo.IME_ACTION_GO ||
+                actionId == EditorInfo.IME_ACTION_UNSPECIFIED) {
+                insertNextRow(row);
+                return true;
+            }
+            return false;
+        });
+
+        int target = Math.max(0, Math.min(index, items.size()));
+        items.add(target, row);
+        itemHost.addView(line, target, ScreenUi.margins(this,0,0,0,6));
+        remove.setOnClickListener(v -> {
+            items.remove(row);
+            itemHost.removeView(line);
+        });
+
+        if (focus) {
+            edit.requestFocus();
+            // The existing soft keyboard stays visible; explicitly show it if
+            // the user created a row using the on-screen Add button.
+            edit.post(() -> {
+                edit.requestFocus();
+                android.view.inputmethod.InputMethodManager keyboard =
+                    (android.view.inputmethod.InputMethodManager)
+                        getSystemService(INPUT_METHOD_SERVICE);
+                if (keyboard != null) keyboard.showSoftInput(edit,
+                    android.view.inputmethod.InputMethodManager.SHOW_IMPLICIT);
+            });
+        }
+        return row;
     }
 
     private JSONArray currentItems() throws Exception {
