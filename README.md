@@ -4,8 +4,9 @@ Open-source, widget-first Android client for your own [Kept](https://github.com/
 
 ## Features — v0.2.0
 
-**Home-screen widgets:**
+**Four home-screen widgets:**
 - **Note collection:** Resizable, scrolling list of cards, note titles, previews, checklist rows and pinned badges; tap notes to edit or tap checkboxes to complete items.
+- **Two-column grid:** Resizable collection widget with Google Keep-style side-by-side cards. Includes the same quick-add, refresh, and filter settings.
 - **Single note:** Select a note or checklist when adding the widget; its contents scroll directly on the home screen. Complete checklist items without opening the editor.
 - **Quick capture:** Compact shortcuts for a new text note or checklist.
 - Choose **all notes**, **pinned**, or an individual **label** per collection widget.
@@ -26,7 +27,7 @@ Open-source, widget-first Android client for your own [Kept](https://github.com/
 3. Prefer the **KeptWidget-0.2.0-signed-APK** artifact if available. This is the upgrade-stable version. If that artifact is missing, only a testing/debug APK is configured.
 4. Unzip the artifact, then install `app-release.apk` (or `app-debug.apk` for testing).
 5. Launch Kept Widget and sign in with your HTTPS server URL, e.g. `https://kept.mcnannay.com`.
-6. From your Android home screen, long-press → Widgets → **Kept Widget** and choose the collection, single-note, or quick-capture widget. You can configure several independently.
+6. From your Android home screen, long-press → Widgets → **Kept Widget** and choose the list collection, grid collection, single-note, or quick-capture widget. You can configure several independently.
 
 **Important upgrade rule:** Android only upgrades apps with the same application ID and signing key. Earlier CI-generated debug APKs used ephemeral keys and **cannot be upgraded to the new stable release**. Uninstall the debug APK once, install the stable release APK, then future stable releases signed with that exact keystore can update in place. Back up any local-only data before uninstalling; Kept server notes remain on your server.
 
@@ -83,7 +84,7 @@ Produces `app/build/outputs/apk/debug/app-debug.apk`. For a release, configure e
 - `NoteEditorActivity.java`: note/checklist editor and organization
 - `NoteRemoteViewsService.java`: scrolling collection widget
 - `SingleNoteRemoteViewsService.java`: scrolling single-note widget
-- `CollectionWidgetProvider.java`, `SingleNoteWidgetProvider.java`, `CaptureWidgetProvider.java`: widget providers
+- `CollectionWidgetProvider.java`, `GridCollectionWidgetProvider.java`, `SingleNoteWidgetProvider.java`, `CaptureWidgetProvider.java`: widget providers
 - `WidgetRouterActivity.java`: Android-safe widget click dispatcher
 - `WidgetConfigActivity.java`, `SingleNoteConfigActivity.java`: widget configuration
 - `ShareReceiverActivity.java`: Android share target
