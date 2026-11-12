@@ -18,6 +18,7 @@ public final class GridCollectionWidgetProvider extends AppWidgetProvider {
         RemoteViews views=new RemoteViews(context.getPackageName(),R.layout.widget_grid_collection);
         String name=SecureStore.preferences(context).getString("title_"+id,"Kept");
         views.setTextViewText(R.id.widget_header,name);
+        WidgetAppearance.applyCollectionHeader(context,views,R.id.widget_root,id);
         views.setTextViewText(R.id.widget_empty,SecureStore.token(context).isEmpty()
             ? "Sign in to Kept Widget to view notes." : "No notes found. Tap + to create one.");
         Intent adapter=new Intent(context,NoteRemoteViewsService.class);
@@ -45,7 +46,9 @@ public final class GridCollectionWidgetProvider extends AppWidgetProvider {
     }
 
     @Override public void onDeleted(Context context,int[] ids){
-        for(int id:ids) SecureStore.preferences(context).edit()
-            .remove("filter_"+id).remove("title_"+id).apply();
+        for(int id:ids) {
+            SecureStore.preferences(context).edit().remove("filter_"+id).remove("title_"+id).apply();
+            WidgetAppearance.clear(context,id);
+        }
     }
 }
