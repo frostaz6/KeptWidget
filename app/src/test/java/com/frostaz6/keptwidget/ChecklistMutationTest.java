@@ -62,6 +62,23 @@ public final class ChecklistMutationTest {
         assertTrue(p.isConflict());
     }
 
+
+    @Test public void changedNoteTimestampBlocksPotentialLostUpdate() throws Exception {
+        ChecklistMutation.Decision stale=ChecklistMutation.apply(
+            items(),10L,false,true,"2026-11-10T00:00:00Z","2026-11-11T00:00:00Z");
+        assertTrue("A newer note may have other checkbox edits",stale.isConflict());
+        assertFalse(stale.needsWrite);
+    }
+
+    @Test public void alreadyAppliedCheckboxDoesNotDoubleToggleAfterTimeout() throws Exception {
+        JSONArray remote=items();
+        remote.getJSONObject(0).put("done",true);
+        ChecklistMutation.Decision retry=ChecklistMutation.apply(
+            remote,10L,false,true,"2026-11-10T00:00:00Z","2026-11-11T00:00:00Z");
+        assertFalse("Expected desired state already reached",retry.isConflict());
+        assertFalse("No second PATCH after lost HTTP response",retry.needsWrite);
+    }
+
     @Test public void transientServerResponsesMustRetry() {
         for(int code:new int[]{408,425,429,500,502,503,504})
             assertTrue("Expected retry for HTTP "+code,PendingSync.shouldRetryHttp(code));
