@@ -14,9 +14,9 @@ import android.widget.ScrollView;
 import android.widget.TextView;
 
 final class ScreenUi {
-    static final int TEXT = Color.rgb(38, 45, 35);
-    static final int MUTED = Color.rgb(96, 105, 93);
-    static final int GREEN = Color.rgb(102, 139, 75);
+    static final int TEXT = 0xffeceee9;
+    static final int MUTED = 0xffaab5aa;
+    static final int GREEN = 0xff4c7d46;
 
     private ScreenUi() {}
 
@@ -27,7 +27,7 @@ final class ScreenUi {
     static LinearLayout page(Activity activity, String title) {
         ScrollView scroll = new ScrollView(activity);
         scroll.setFillViewport(true);
-        scroll.setBackgroundColor(Color.rgb(247, 246, 240));
+        scroll.setBackgroundColor(0xff181b1b);
         LinearLayout root = new LinearLayout(activity);
         root.setOrientation(LinearLayout.VERTICAL);
         root.setPadding(dp(activity, 22), dp(activity, 22), dp(activity, 22), dp(activity, 30));
@@ -66,6 +66,7 @@ final class ScreenUi {
         edit.setSingleLine(true);
         edit.setTextSize(16);
         edit.setTextColor(TEXT);
+        edit.setHintTextColor(MUTED);
         edit.setInputType(inputType);
         edit.setSelectAllOnFocus(false);
         return edit;
@@ -78,7 +79,7 @@ final class ScreenUi {
         button.setTextSize(15);
         button.setTextColor(primary ? Color.WHITE : TEXT);
         GradientDrawable bg = new GradientDrawable();
-        bg.setColor(primary ? GREEN : Color.rgb(235, 235, 227));
+        bg.setColor(primary ? GREEN : 0xff303735);
         bg.setCornerRadius(dp(c, 13));
         button.setBackground(bg);
         button.setPadding(dp(c, 12), dp(c, 10), dp(c, 12), dp(c, 10));
