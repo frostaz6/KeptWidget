@@ -12,6 +12,13 @@
       </intent-filter>
     </activity>
     <activity android:name=".NoteEditorActivity" android:exported="false"/>
+    <activity android:name=".ShareReceiverActivity" android:exported="true">
+      <intent-filter>
+        <action android:name="android.intent.action.SEND"/>
+        <category android:name="android.intent.category.DEFAULT"/>
+        <data android:mimeType="text/plain"/>
+      </intent-filter>
+    </activity>
     <activity android:name=".WidgetRouterActivity" android:exported="false"
       android:theme="@android:style/Theme.Translucent.NoTitleBar"/>
     <activity android:name=".WidgetConfigActivity" android:exported="true"/>
