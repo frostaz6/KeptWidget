@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+  android:id="@+id/single_item_root"
+  android:layout_width="match_parent" android:layout_height="wrap_content"
+  android:minHeight="38dp" android:gravity="center_vertical"
+  android:orientation="horizontal" android:paddingStart="6dp"
+  android:paddingEnd="6dp" android:paddingTop="5dp" android:paddingBottom="5dp">
+  <TextView android:id="@+id/single_checkbox" android:layout_width="36dp"
+    android:layout_height="42dp" android:gravity="center_vertical"
+    android:text="☐" android:textSize="24sp" android:textColor="#4C6740"
+    android:contentDescription="Toggle checklist item"/>
+  <TextView android:id="@+id/single_item_text" android:layout_width="0dp"
+    android:layout_height="wrap_content" android:layout_weight="1"
+    android:gravity="center_vertical" android:textSize="14sp"
+    android:textColor="#3C4339" android:ellipsize="end"
+    android:maxLines="4"/>
+</LinearLayout>
