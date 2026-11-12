@@ -26,6 +26,7 @@ public class WidgetConfigActivity extends Activity {
     private Spinner labelSpinner;
     private RadioGroup modes;
     private TextView status;
+    private WidgetAppearance.Controls appearance;
     private final int ALL = 1, PINNED = 2, LABEL = 3;
 
     @Override public void onCreate(Bundle state) {
@@ -55,6 +56,7 @@ public class WidgetConfigActivity extends Activity {
         root.addView(labelSpinner, ScreenUi.margins(this,0,0,0,12));
         modes.setOnCheckedChangeListener((g, id) -> labelSpinner.setVisibility(id == LABEL ? View.VISIBLE : View.GONE));
         labelSpinner.setVisibility(View.GONE);
+        appearance = WidgetAppearance.controls(this,root,widgetId,true);
         status = ScreenUi.hint(this, "");
         root.addView(status, ScreenUi.margins(this,0,0,0,18));
 
@@ -125,6 +127,7 @@ public class WidgetConfigActivity extends Activity {
             filter = "label:" + label.optLong("id");
             title = label.optString("name", "Kept");
         }
+        appearance.save();
         SecureStore.preferences(this).edit().putString("filter_" + widgetId, filter)
             .putString("title_" + widgetId, title).apply();
         AppWidgetManager manager = AppWidgetManager.getInstance(this);
