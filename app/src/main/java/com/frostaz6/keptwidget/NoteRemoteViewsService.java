@@ -50,6 +50,7 @@ public class NoteRemoteViewsService extends RemoteViewsService {
                 try { fetched = new JSONArray(SecureStore.cachedNotes(context)); }
                 catch (Exception ignored) { fetched = new JSONArray(); }
             }
+            fetched=PendingSync.overlay(context,fetched);
             String filter = SecureStore.preferences(context).getString("filter_" + widgetId, "all");
             notes.clear();
             for (int i = 0; i < fetched.length(); i++) {
@@ -130,6 +131,8 @@ public class NoteRemoteViewsService extends RemoteViewsService {
                 row.setViewVisibility(CHECK_IDS[i], View.GONE);
 
             String footer = note.optBoolean("pinned") ? "📌 Pinned" : "";
+            if(note.optBoolean("syncPending"))footer += (footer.isEmpty()?"":"  ·  ")+
+                (note.optBoolean("syncConflict")?"⚠ Sync conflict":"⏳ Pending sync");
             if (checks != null && checks.length() > shown)
                 footer += (footer.isEmpty() ? "" : "  ·  ") + "+" + (checks.length()-shown) + " more shown in editor";
             row.setTextViewText(R.id.note_footer, footer);
