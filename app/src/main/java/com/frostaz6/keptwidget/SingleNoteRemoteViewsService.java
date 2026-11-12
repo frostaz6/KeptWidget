@@ -41,6 +41,8 @@ public final class SingleNoteRemoteViewsService extends RemoteViewsService {
                 try { note=new JSONObject(SecureStore.singleNote(context,noteId));}
                 catch(Exception ignoredAgain) {return;}
             }
+            JSONArray withPending=PendingSync.overlay(context,new JSONArray().put(note));
+            if(withPending.optJSONObject(0)!=null)note=withPending.optJSONObject(0);
             if(note.optBoolean("locked") && !note.optBoolean("lockedContentAvailable",false)) {
                 JSONObject locked=new JSONObject();
                 try {locked.put("data","🔒 Locked note — open Kept to unlock");}
