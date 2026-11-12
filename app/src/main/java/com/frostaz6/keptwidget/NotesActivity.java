@@ -330,10 +330,10 @@ public final class NotesActivity extends Activity {
                 shown++;
             }
         } else {
-            String body=KeptApi.plain(note.optString("previewText",note.optString("noteBody")));
+            String body=KeptApi.formatted(note.optString("noteBody"));
             if(!body.isEmpty()) {
                 TextView text=ScreenUi.label(this,body,13,false);
-                text.setMaxLines(8);
+                text.setMaxLines(12);
                 text.setEllipsize(android.text.TextUtils.TruncateAt.END);
                 card.addView(text,ScreenUi.margins(this,0,8,0,0));
             }
