@@ -127,7 +127,11 @@ public class WidgetConfigActivity extends Activity {
         }
         SecureStore.preferences(this).edit().putString("filter_" + widgetId, filter)
             .putString("title_" + widgetId, title).apply();
-        CollectionWidgetProvider.render(this, AppWidgetManager.getInstance(this), widgetId);
+        AppWidgetManager manager = AppWidgetManager.getInstance(this);
+        android.appwidget.AppWidgetProviderInfo info = manager.getAppWidgetInfo(widgetId);
+        if (info != null && info.provider.getClassName().endsWith("GridCollectionWidgetProvider"))
+            GridCollectionWidgetProvider.render(this,manager,widgetId);
+        else CollectionWidgetProvider.render(this,manager,widgetId);
         Intent done = new Intent();
         done.putExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, widgetId);
         setResult(RESULT_OK, done);
