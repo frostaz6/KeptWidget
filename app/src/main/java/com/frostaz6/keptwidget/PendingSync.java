@@ -140,6 +140,7 @@ final class PendingSync {
                         .put("kind","check").put("state","queued")
                         .put("noteId",noteId).put("itemId",itemId)
                         .put("baselineDone",item.optBoolean("done"))
+                        .put("baselineUpdatedAt",note.optString("updatedAt",""))
                         .put("desired",!item.optBoolean("done")));
                     save(c,a);
                     schedule(c);
@@ -320,7 +321,8 @@ final class PendingSync {
                 op.optBoolean("baselineDone") : null;
             ChecklistMutation.Decision plan=ChecklistMutation.apply(
                 current.optJSONArray("checkBoxes"),op.getLong("itemId"),baseline,
-                op.optBoolean("desired"));
+                op.optBoolean("desired"),op.optString("baselineUpdatedAt",""),
+                current.optString("updatedAt",""));
             if(plan.isConflict())throw new Conflict(plan.conflict);
             if(plan.needsWrite) {
                 KeptApi.patch(c,noteId,new JSONObject().put("checkBoxes",plan.items));
