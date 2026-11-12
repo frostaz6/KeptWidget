@@ -47,6 +47,9 @@ public class LoginActivity extends Activity {
         Button collection = ScreenUi.button(this, "Add note collection widget", false);
         root.addView(collection, ScreenUi.margins(this,0,8,0,10));
         collection.setOnClickListener(v -> pin(CollectionWidgetProvider.class));
+        Button grid = ScreenUi.button(this, "Add two-column grid widget", false);
+        root.addView(grid, ScreenUi.margins(this,0,0,0,10));
+        grid.setOnClickListener(v -> pin(GridCollectionWidgetProvider.class));
         Button capture = ScreenUi.button(this, "Add quick capture widget", false);
         root.addView(capture, ScreenUi.margins(this,0,0,0,10));
         capture.setOnClickListener(v -> pin(CaptureWidgetProvider.class));
