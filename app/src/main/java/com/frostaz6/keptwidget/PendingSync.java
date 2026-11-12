@@ -235,7 +235,7 @@ final class PendingSync {
         }
     }
 
-    private static boolean equivalent(Object a,Object b){
+    static boolean equivalent(Object a,Object b){
         if(a==JSONObject.NULL)a=null;
         if(b==JSONObject.NULL)b=null;
         if(a==null||b==null)return a==b;
