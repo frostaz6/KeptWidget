@@ -50,6 +50,12 @@ public class LoginActivity extends Activity {
         Button capture = ScreenUi.button(this, "Add quick capture widget", false);
         root.addView(capture, ScreenUi.margins(this,0,0,0,10));
         capture.setOnClickListener(v -> pin(CaptureWidgetProvider.class));
+        Button single = ScreenUi.button(this, "Add single-note widget", false);
+        root.addView(single, ScreenUi.margins(this,0,0,0,10));
+        single.setOnClickListener(v -> pin(SingleNoteWidgetProvider.class));
+        Button home = ScreenUi.button(this, "Open notes and search", false);
+        root.addView(home, ScreenUi.margins(this,0,0,0,10));
+        home.setOnClickListener(v -> startActivity(new Intent(this, NotesActivity.class)));
         Button browser = ScreenUi.button(this, "Open full Kept editor in browser", false);
         root.addView(browser, ScreenUi.margins(this,0,0,0,10));
         browser.setOnClickListener(v -> {
@@ -112,7 +118,9 @@ public class LoginActivity extends Activity {
                     totp.setText("");
                     signIn.setEnabled(true);
                     updateStatus();
-                    Toast.makeText(this, "Connected! Add a widget to your home screen.", Toast.LENGTH_LONG).show();
+                    Toast.makeText(this, "Connected to Kept", Toast.LENGTH_SHORT).show();
+                    startActivity(new Intent(this, NotesActivity.class));
+                    finish();
                 });
             } catch (Exception e) {
                 runOnUiThread(() -> {
