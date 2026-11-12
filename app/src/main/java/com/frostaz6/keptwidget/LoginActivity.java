@@ -68,10 +68,20 @@ public class LoginActivity extends Activity {
         Button signOut = ScreenUi.button(this, "Sign out and clear saved notes", false);
         root.addView(signOut, ScreenUi.margins(this,0,0,0,16));
         signOut.setOnClickListener(v -> {
-            SecureStore.clear(this);
-            status.setText("Signed out");
-            password.setText("");
-            CollectionWidgetProvider.refreshAll(this);
+            Runnable clear=()->{
+                SecureStore.clear(this);
+                status.setText("Signed out");
+                password.setText("");
+                CollectionWidgetProvider.refreshAll(this);
+            };
+            int pending=PendingSync.count(this);
+            if(pending>0){
+                new android.app.AlertDialog.Builder(this)
+                    .setTitle("Unsynced edits")
+                    .setMessage(pending+" offline change(s) will be permanently discarded if you sign out. Continue?")
+                    .setNegativeButton("Cancel",null)
+                    .setPositiveButton("Discard and sign out",(dialog,which)->clear.run()).show();
+            } else clear.run();
         });
         root.addView(ScreenUi.hint(this,
             "Login uses Kept's native /api/auth/login endpoint. Supports password and TOTP accounts; OIDC-only accounts are not supported yet."),
