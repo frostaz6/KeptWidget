@@ -5,4 +5,5 @@
   android:initialLayout="@layout/widget_capture"
   android:previewLayout="@layout/widget_capture"
   android:resizeMode="horizontal" android:widgetCategory="home_screen"
-  android:updatePeriodMillis="0"/>
+  android:updatePeriodMillis="0"
+  android:configure="com.frostaz6.keptwidget.CaptureWidgetConfigActivity"/>
