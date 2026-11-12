@@ -32,6 +32,8 @@
       <meta-data android:name="android.appwidget.provider" android:resource="@xml/single_widget_info"/>
     </receiver>
     <receiver android:name=".WidgetActionReceiver" android:exported="false"/>
+    <service android:name=".SingleNoteRemoteViewsService"
+      android:permission="android.permission.BIND_REMOTEVIEWS" android:exported="false"/>
     <service android:name=".NoteRemoteViewsService"
       android:permission="android.permission.BIND_REMOTEVIEWS" android:exported="false"/>
   </application>
