@@ -28,6 +28,9 @@ public final class WidgetSettingsActivity extends Activity {
                 "No widgets found. Long-press your home screen, open Widgets, and choose Kept Widget."),
                 ScreenUi.margins(this,0,0,0,20));
         }
+        Button pending=ScreenUi.button(this,"Offline sync status ("+PendingSync.count(this)+")",false);
+        root.addView(pending,ScreenUi.margins(this,0,18,0,10));
+        pending.setOnClickListener(v->startActivity(new Intent(this,SyncStatusActivity.class)));
         Button account=ScreenUi.button(this,"Account and server settings",false);
         root.addView(account,ScreenUi.margins(this,0,16,0,10));
         account.setOnClickListener(v->startActivity(new Intent(this,LoginActivity.class)));
