@@ -4,7 +4,8 @@
   <application android:allowBackup="false" android:usesCleartextTraffic="false"
     android:icon="@drawable/ic_launcher" android:label="@string/app_name"
     android:theme="@style/AppTheme">
-    <activity android:name=".LoginActivity" android:exported="true">
+    <activity android:name=".LoginActivity" android:exported="false" />
+    <activity android:name=".NotesActivity" android:exported="true">
       <intent-filter>
         <action android:name="android.intent.action.MAIN"/>
         <category android:name="android.intent.category.LAUNCHER"/>
@@ -14,6 +15,7 @@
     <activity android:name=".WidgetRouterActivity" android:exported="false"
       android:theme="@android:style/Theme.Translucent.NoTitleBar"/>
     <activity android:name=".WidgetConfigActivity" android:exported="true"/>
+    <activity android:name=".SingleNoteConfigActivity" android:exported="true"/>
     <receiver android:name=".CollectionWidgetProvider"
       android:label="@string/collection_widget" android:exported="true">
       <intent-filter><action android:name="android.appwidget.action.APPWIDGET_UPDATE"/></intent-filter>
@@ -23,6 +25,11 @@
       android:label="@string/capture_widget" android:exported="true">
       <intent-filter><action android:name="android.appwidget.action.APPWIDGET_UPDATE"/></intent-filter>
       <meta-data android:name="android.appwidget.provider" android:resource="@xml/capture_widget_info"/>
+    </receiver>
+    <receiver android:name=".SingleNoteWidgetProvider"
+      android:label="@string/single_widget" android:exported="true">
+      <intent-filter><action android:name="android.appwidget.action.APPWIDGET_UPDATE"/></intent-filter>
+      <meta-data android:name="android.appwidget.provider" android:resource="@xml/single_widget_info"/>
     </receiver>
     <receiver android:name=".WidgetActionReceiver" android:exported="false"/>
     <service android:name=".NoteRemoteViewsService"
