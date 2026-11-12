@@ -26,12 +26,17 @@ public final class SingleNoteRemoteViewsService extends RemoteViewsService {
         private long noteId;
         private final List<JSONObject> items=new ArrayList<>();
         private boolean checklist;
+        private int completedCount;
+        private boolean showingCompleted;
         Factory(Context c,int id) {context=c;widgetId=id;}
         @Override public void onCreate(){}
 
         @Override public synchronized void onDataSetChanged(){
             noteId=SecureStore.preferences(context).getLong("single_note_"+widgetId,-1L);
             items.clear();
+            completedCount=0;
+            showingCompleted=SecureStore.preferences(context)
+                .getBoolean("show_completed_"+widgetId,false);
             if(noteId<1 || SecureStore.token(context).isEmpty())return;
             JSONObject note=null;
             try {
@@ -52,10 +57,10 @@ public final class SingleNoteRemoteViewsService extends RemoteViewsService {
             } else if(note.optBoolean("isCbox")) {
                 checklist=true;
                 JSONArray list=note.optJSONArray("checkBoxes");
-                for(int i=0;list!=null && i<list.length();i++){
-                    JSONObject item=list.optJSONObject(i);
-                    if(item!=null)items.add(item);
-                }
+                ChecklistPresentation.Selection selection=
+                    ChecklistPresentation.select(list,showingCompleted);
+                completedCount=selection.completed;
+                items.addAll(selection.rows);
             } else {
                 checklist=false;
                 JSONObject body=new JSONObject();
@@ -63,7 +68,8 @@ public final class SingleNoteRemoteViewsService extends RemoteViewsService {
                 catch(Exception ignored){}
                 items.add(body);
             }
-            SingleNoteWidgetProvider.updateTitle(context,widgetId,note);
+            SingleNoteWidgetProvider.updateTitle(context,widgetId,note,
+                completedCount,showingCompleted,items.size());
         }
 
         @Override public synchronized int getCount(){return items.size();}
