@@ -62,6 +62,7 @@ public class NoteEditorActivity extends Activity {
     private String selectedColor = "#FFFFFF";
     private JSONArray chosenLabels = new JSONArray();
     private boolean saving;
+    private android.window.OnBackInvokedCallback backCallback;
 
     private static final class ItemRow {
         final CheckBox checked;
@@ -96,6 +97,11 @@ public class NoteEditorActivity extends Activity {
         editorRoot.setFitsSystemWindows(true);
         editorRoot.setBackgroundColor(0xff1c1c1f);
         setContentView(editorRoot);
+        if (android.os.Build.VERSION.SDK_INT >= 33) {
+            backCallback = this::requestClose;
+            getOnBackInvokedDispatcher().registerOnBackInvokedCallback(
+                android.window.OnBackInvokedDispatcher.PRIORITY_DEFAULT,backCallback);
+        }
 
         LinearLayout toolbar = new LinearLayout(this);
         toolbar.setGravity(Gravity.CENTER_VERTICAL);
@@ -325,6 +331,12 @@ public class NoteEditorActivity extends Activity {
 
     @Override @Deprecated public void onBackPressed() {
         requestClose();
+    }
+
+    @Override protected void onDestroy() {
+        if (android.os.Build.VERSION.SDK_INT >= 33 && backCallback != null)
+            getOnBackInvokedDispatcher().unregisterOnBackInvokedCallback(backCallback);
+        super.onDestroy();
     }
 
     private int firstCompletedIndex() {
