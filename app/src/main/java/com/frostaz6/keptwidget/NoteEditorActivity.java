@@ -307,7 +307,7 @@ public class NoteEditorActivity extends Activity {
 
     private void applyEditorColor() {
         int background = 0xff1c1c1f;
-        if (colorTouched && selectedColor!=null
+        if (selectedColor!=null
             && !"#FFFFFF".equalsIgnoreCase(selectedColor)) {
             background = WidgetAppearance.noteColor(selectedColor,true);
         }
