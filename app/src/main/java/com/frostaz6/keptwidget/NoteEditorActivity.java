@@ -170,7 +170,7 @@ public class NoteEditorActivity extends Activity {
         addItem.setTextColor(0xffadb2af);
         addItem.setTextSize(16);
         addItem.setPadding(ScreenUi.dp(this,12),ScreenUi.dp(this,9),0,ScreenUi.dp(this,9));
-        contents.addView(addItem,ScreenUi.margins(this,ScreenUi.dp(this,31),3,0,8));
+        contents.addView(addItem,ScreenUi.margins(this,31,3,0,8));
         addItem.setOnClickListener(v -> insertRow(null,firstCompletedIndex(),true));
 
         completedHeader = ScreenUi.label(this,"▸ Completed items",15,false);
@@ -626,7 +626,10 @@ public class NoteEditorActivity extends Activity {
         JSONArray result = new JSONArray();
         for (ItemRow row : items) {
             String text = row.text.getText().toString().trim();
-            if (text.isEmpty()) continue;
+            // Existing blank checklist entries are valid Kept data: never delete
+            // them simply because the user opened the note and saved it.
+            // Newly-created empty placeholders are not written until edited.
+            if (text.isEmpty() && row.original == null) continue;
             JSONObject entry = row.original == null ? new JSONObject()
                 : new JSONObject(row.original.toString());
             entry.put("id", row.id);
