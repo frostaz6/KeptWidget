@@ -7,6 +7,17 @@ import android.net.Uri;
 import android.os.Bundle;
 import android.text.InputType;
 import android.view.Gravity;
+import android.view.DragEvent;
+import android.view.MotionEvent;
+import android.view.WindowManager;
+import android.content.ClipData;
+import android.content.res.ColorStateList;
+import android.graphics.Paint;
+import android.graphics.Typeface;
+import android.widget.ImageButton;
+import android.widget.FrameLayout;
+import android.widget.PopupMenu;
+import android.widget.ScrollView;
 import android.view.KeyEvent;
 import android.view.inputmethod.EditorInfo;
 import android.view.View;
@@ -40,9 +51,13 @@ public class NoteEditorActivity extends Activity {
     private JSONObject original;
     private EditText title, body;
     private TextView status;
-    private LinearLayout itemHost;
-    private Button save, addItem, colorButton, labelsButton;
-    private CheckBox pinned;
+    private LinearLayout itemHost, completedHost, editorRoot;
+    private ScrollView editorScroll;
+    private TextView completedHeader;
+    private boolean showCompleted = false;
+    private ImageButton pinButton;
+    private Button save, addItem, labelsButton;
+    private boolean isPinned;
     private boolean colorTouched = false, labelsTouched = false;
     private String selectedColor = "#FFFFFF";
     private JSONArray chosenLabels = new JSONArray();
@@ -51,11 +66,13 @@ public class NoteEditorActivity extends Activity {
     private static final class ItemRow {
         final CheckBox checked;
         final EditText text;
+        final LinearLayout line;
         final long id;
         final JSONObject original;
-        ItemRow(CheckBox checked, EditText text, long id, JSONObject original) {
+        ItemRow(CheckBox checked, EditText text, LinearLayout line, long id, JSONObject original) {
             this.checked = checked;
             this.text = text;
+            this.line = line;
             this.id = id;
             this.original = original;
         }
@@ -70,68 +87,147 @@ public class NoteEditorActivity extends Activity {
         }
         noteId = getIntent().getLongExtra(EXTRA_ID, -1L);
         isChecklist = getIntent().getBooleanExtra(EXTRA_LIST, false);
-        LinearLayout root = ScreenUi.page(this, noteId > 0 ? "Edit note" :
-            (isChecklist ? "New checklist" : "New note"));
-        status = ScreenUi.hint(this, noteId > 0 ? "Loading note…" : "Syncs to your Kept server.");
-        root.addView(status, ScreenUi.margins(this,0,0,0,12));
-        title = ScreenUi.field(this, "Title", InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_FLAG_CAP_SENTENCES);
-        root.addView(title, ScreenUi.margins(this,0,0,0,14));
-        body = ScreenUi.field(this, "Write a note…", InputType.TYPE_CLASS_TEXT |
-            InputType.TYPE_TEXT_FLAG_MULTI_LINE | InputType.TYPE_TEXT_FLAG_CAP_SENTENCES);
+        getWindow().setStatusBarColor(0xff1c1c1f);
+        getWindow().setNavigationBarColor(0xff1c1c1f);
+        getWindow().setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE);
+
+        editorRoot = new LinearLayout(this);
+        editorRoot.setOrientation(LinearLayout.VERTICAL);
+        editorRoot.setBackgroundColor(0xff1c1c1f);
+        setContentView(editorRoot);
+
+        LinearLayout toolbar = new LinearLayout(this);
+        toolbar.setGravity(Gravity.CENTER_VERTICAL);
+        toolbar.setPadding(ScreenUi.dp(this,12),ScreenUi.dp(this,5),
+            ScreenUi.dp(this,12),ScreenUi.dp(this,5));
+        editorRoot.addView(toolbar,new LinearLayout.LayoutParams(-1,ScreenUi.dp(this,60)));
+
+        ImageButton back = icon(R.drawable.ic_editor_back, "Back and save note");
+        toolbar.addView(back,iconParams());
+        back.setOnClickListener(v -> requestClose());
+        toolbar.addView(new View(this),new LinearLayout.LayoutParams(0,1,1f));
+
+        pinButton = icon(R.drawable.ic_editor_pin,"Pin or unpin note");
+        toolbar.addView(pinButton,iconParams());
+        pinButton.setOnClickListener(v -> {
+            isPinned = !isPinned;
+            updatePinVisual();
+        });
+        ImageButton share = icon(R.drawable.ic_editor_share,"Collaborators (open Kept)");
+        toolbar.addView(share,iconParams());
+        share.setOnClickListener(v -> {
+            Toast.makeText(this,"Manage collaborators in Kept's full editor",Toast.LENGTH_SHORT).show();
+            openKeptWeb();
+        });
+        ImageButton archive = icon(R.drawable.ic_editor_archive,"Archive note");
+        toolbar.addView(archive,iconParams());
+        archive.setOnClickListener(v -> confirmLifecycle("archived"));
+
+        editorScroll = new ScrollView(this);
+        editorScroll.setFillViewport(true);
+        editorScroll.setClipToPadding(false);
+        editorRoot.addView(editorScroll,new LinearLayout.LayoutParams(-1,0,1f));
+
+        LinearLayout contents = new LinearLayout(this);
+        contents.setOrientation(LinearLayout.VERTICAL);
+        contents.setPadding(ScreenUi.dp(this,24),ScreenUi.dp(this,36),
+            ScreenUi.dp(this,20),ScreenUi.dp(this,30));
+        editorScroll.addView(contents,new ScrollView.LayoutParams(-1,-2));
+
+        title = ScreenUi.field(this,"Title",
+            InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_FLAG_CAP_SENTENCES);
+        title.setTextSize(26);
+        title.setHintTextColor(0xff818185);
+        title.setTextColor(0xffededf0);
+        title.setBackgroundColor(Color.TRANSPARENT);
+        title.setPadding(0,ScreenUi.dp(this,6),0,ScreenUi.dp(this,10));
+        title.setSingleLine(false);
+        title.setMaxLines(3);
+        contents.addView(title,ScreenUi.margins(this,0,0,0,12));
+
+        status = ScreenUi.hint(this,noteId>0?"Loading note…":"");
+        status.setTextColor(0xffbfc3bd);
+        contents.addView(status,ScreenUi.margins(this,0,0,0,6));
+
+        body = ScreenUi.field(this,"Note",
+            InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_FLAG_MULTI_LINE |
+            InputType.TYPE_TEXT_FLAG_CAP_SENTENCES);
         body.setSingleLine(false);
-        body.setMinLines(5);
+        body.setMinLines(12);
+        body.setTextSize(17);
         body.setGravity(Gravity.TOP | Gravity.START);
-        root.addView(body, ScreenUi.margins(this,0,0,0,12));
+        body.setBackgroundColor(Color.TRANSPARENT);
+        body.setPadding(0,ScreenUi.dp(this,8),0,ScreenUi.dp(this,12));
+        contents.addView(body,ScreenUi.margins(this,0,0,0,8));
+
         itemHost = new LinearLayout(this);
         itemHost.setOrientation(LinearLayout.VERTICAL);
-        root.addView(itemHost, ScreenUi.margins(this,0,0,0,10));
-        addItem = ScreenUi.button(this, "+ Add checklist item", false);
-        root.addView(addItem, ScreenUi.margins(this,0,0,0,14));
-        addItem.setOnClickListener(v -> insertRow(null, items.size(), true));
+        contents.addView(itemHost,ScreenUi.margins(this,0,0,0,0));
 
-        pinned = new CheckBox(this);
-        pinned.setText("Pin this note");
-        pinned.setTextSize(16);
-        root.addView(pinned, ScreenUi.margins(this,0,0,0,8));
+        addItem = ScreenUi.button(this,"+  List item",false);
+        addItem.setBackgroundColor(Color.TRANSPARENT);
+        addItem.setGravity(Gravity.CENTER_VERTICAL | Gravity.START);
+        addItem.setTextColor(0xffadb2af);
+        addItem.setTextSize(16);
+        addItem.setPadding(ScreenUi.dp(this,12),ScreenUi.dp(this,9),0,ScreenUi.dp(this,9));
+        contents.addView(addItem,ScreenUi.margins(this,ScreenUi.dp(this,31),3,0,8));
+        addItem.setOnClickListener(v -> insertRow(null,firstCompletedIndex(),true));
 
-        LinearLayout actions = new LinearLayout(this);
-        actions.setOrientation(LinearLayout.HORIZONTAL);
-        root.addView(actions, ScreenUi.margins(this,0,0,0,12));
-        colorButton = ScreenUi.button(this, "🎨 Color", false);
-        actions.addView(colorButton, new LinearLayout.LayoutParams(0,ScreenUi.dp(this,48),1f));
-        colorButton.setOnClickListener(v -> pickColor());
-        labelsButton = ScreenUi.button(this, "🏷 Labels", false);
-        LinearLayout.LayoutParams labelParams = new LinearLayout.LayoutParams(0,ScreenUi.dp(this,48),1f);
-        labelParams.leftMargin = ScreenUi.dp(this,8);
-        actions.addView(labelsButton,labelParams);
-        labelsButton.setOnClickListener(v -> pickLabels());
+        completedHeader = ScreenUi.label(this,"▸ Completed items",15,false);
+        completedHeader.setTextColor(0xffb9b9bd);
+        completedHeader.setPadding(ScreenUi.dp(this,12),ScreenUi.dp(this,20),
+            ScreenUi.dp(this,6),ScreenUi.dp(this,18));
+        contents.addView(completedHeader,ScreenUi.margins(this,0,12,0,0));
+        completedHeader.setOnClickListener(v -> {
+            showCompleted = !showCompleted;
+            refreshCompletedGroup();
+        });
+        completedHost = new LinearLayout(this);
+        completedHost.setOrientation(LinearLayout.VERTICAL);
+        contents.addView(completedHost);
 
-        save = ScreenUi.button(this, "Save to Kept", true);
-        root.addView(save, ScreenUi.margins(this,0,0,0,10));
-        save.setOnClickListener(v -> submit());
-        if (noteId > 0) {
-            Button archive = ScreenUi.button(this,"Archive this note",false);
-            root.addView(archive,ScreenUi.margins(this,0,0,0,10));
-            archive.setOnClickListener(v -> new AlertDialog.Builder(this)
-                .setMessage("Archive this note in Kept?")
-                .setNegativeButton("Cancel",null)
-                .setPositiveButton("Archive",(d,w)->changeLifecycle("archived"))
-                .show());
-            Button trash = ScreenUi.button(this,"Move note to trash",false);
-            root.addView(trash,ScreenUi.margins(this,0,0,0,10));
-            trash.setOnClickListener(v -> new AlertDialog.Builder(this)
-                .setMessage("Move this note to trash? You can restore it from Kept later.")
-                .setNegativeButton("Cancel",null)
-                .setPositiveButton("Trash",(d,w)->changeLifecycle("trashed"))
-                .show());
-        }
-        Button browser = ScreenUi.button(this, "Open full Kept web editor", false);
-        root.addView(browser, ScreenUi.margins(this,0,0,0,10));
-        browser.setOnClickListener(v -> startActivity(new Intent(Intent.ACTION_VIEW,
-            Uri.parse(SecureStore.baseUrl(this)))));
-        Button cancel = ScreenUi.button(this, "Close", false);
-        root.addView(cancel, ScreenUi.margins(this,0,0,0,8));
-        cancel.setOnClickListener(v -> finish());
+        // The original saving / offline conflict flow remains in place.
+        // The editor saves on Back; Save is also available from overflow.
+        save = ScreenUi.button(this,"Save",true);
+        labelsButton = ScreenUi.button(this,"Labels",false);
+        itemHost.setOnDragListener((view,event) -> onChecklistDrag(event,false));
+        completedHost.setOnDragListener((view,event) -> onChecklistDrag(event,true));
+
+        LinearLayout bottom = new LinearLayout(this);
+        bottom.setGravity(Gravity.CENTER_VERTICAL);
+        bottom.setPadding(ScreenUi.dp(this,14),ScreenUi.dp(this,5),
+            ScreenUi.dp(this,14),ScreenUi.dp(this,5));
+        bottom.setBackgroundColor(0xff3b3b40);
+        editorRoot.addView(bottom,new LinearLayout.LayoutParams(-1,ScreenUi.dp(this,62)));
+
+        ImageButton add = icon(R.drawable.ic_editor_add,"Add checklist item");
+        bottom.addView(add,iconParams());
+        add.setOnClickListener(v -> {
+            if (isChecklist) insertRow(null,firstCompletedIndex(),true);
+            else {
+                body.requestFocus();
+                android.view.inputmethod.InputMethodManager keyboard =
+                    (android.view.inputmethod.InputMethodManager)
+                        getSystemService(INPUT_METHOD_SERVICE);
+                if (keyboard != null) keyboard.showSoftInput(body,
+                    android.view.inputmethod.InputMethodManager.SHOW_IMPLICIT);
+            }
+        });
+        ImageButton palette = icon(R.drawable.ic_editor_palette,"Choose note color");
+        bottom.addView(palette,iconParams());
+        palette.setOnClickListener(v -> pickColor());
+        ImageButton formatting = icon(R.drawable.ic_editor_format,"Text formatting in Kept");
+        bottom.addView(formatting,iconParams());
+        formatting.setOnClickListener(v -> new AlertDialog.Builder(this)
+            .setTitle("Advanced formatting")
+            .setMessage("Rich-text formatting is available in the full Kept editor. Open it without altering this note?")
+            .setNegativeButton("Stay here",null)
+            .setPositiveButton("Open Kept",(dialog,which)->openKeptWeb()).show());
+        bottom.addView(new View(this),new LinearLayout.LayoutParams(0,1,1f));
+        ImageButton more = icon(R.drawable.ic_editor_more,"More note actions");
+        bottom.addView(more,iconParams());
+        more.setOnClickListener(this::showActionsMenu);
+
         if (noteId > 0) load();
         else {
             title.setText(getIntent().getStringExtra(EXTRA_INITIAL_TITLE));
@@ -140,11 +236,163 @@ public class NoteEditorActivity extends Activity {
         }
     }
 
+    private ImageButton icon(int drawable,String accessibility) {
+        ImageButton button = new ImageButton(this);
+        button.setImageResource(drawable);
+        button.setBackgroundColor(Color.TRANSPARENT);
+        button.setColorFilter(0xffd5d5da);
+        button.setPadding(ScreenUi.dp(this,9),ScreenUi.dp(this,9),
+            ScreenUi.dp(this,9),ScreenUi.dp(this,9));
+        button.setScaleType(ImageButton.ScaleType.FIT_CENTER);
+        button.setContentDescription(accessibility);
+        return button;
+    }
+
+    private LinearLayout.LayoutParams iconParams() {
+        return new LinearLayout.LayoutParams(ScreenUi.dp(this,49),ScreenUi.dp(this,49));
+    }
+
+    private void updatePinVisual() {
+        if (pinButton != null)
+            pinButton.setColorFilter(isPinned?0xffd7efaa:0xffc7c7cb);
+    }
+
+    private void openKeptWeb() {
+        startActivity(new Intent(Intent.ACTION_VIEW,Uri.parse(SecureStore.baseUrl(this))));
+    }
+
+    private void confirmLifecycle(String field) {
+        if (noteId < 1 || original == null) {
+            Toast.makeText(this,"Save the new note first",Toast.LENGTH_SHORT).show();
+            return;
+        }
+        String action = "archived".equals(field) ? "Archive" : "Move to trash";
+        new AlertDialog.Builder(this)
+            .setTitle(action+" note?")
+            .setMessage("Any unsaved edits in this screen will not be included. Save them first if needed.")
+            .setNegativeButton("Cancel",null)
+            .setPositiveButton(action,(dialog,which)->changeLifecycle(field))
+            .show();
+    }
+
+    private void showActionsMenu(View anchor) {
+        PopupMenu menu = new PopupMenu(this,anchor);
+        menu.getMenu().add("Save note");
+        menu.getMenu().add("Labels");
+        menu.getMenu().add("Pin / unpin");
+        if (noteId > 0) {
+            menu.getMenu().add("Archive");
+            menu.getMenu().add("Move to trash");
+        }
+        menu.getMenu().add("Open full Kept editor");
+        menu.setOnMenuItemClickListener(item -> {
+            String action=item.getTitle().toString();
+            if ("Save note".equals(action)) submit();
+            else if ("Labels".equals(action)) pickLabels();
+            else if ("Pin / unpin".equals(action)) { isPinned=!isPinned; updatePinVisual(); }
+            else if ("Archive".equals(action)) confirmLifecycle("archived");
+            else if ("Move to trash".equals(action)) confirmLifecycle("trashed");
+            else if ("Open full Kept editor".equals(action)) openKeptWeb();
+            return true;
+        });
+        menu.show();
+    }
+
+    private void applyEditorColor() {
+        int background = 0xff1c1c1f;
+        if (colorTouched && selectedColor!=null
+            && !"#FFFFFF".equalsIgnoreCase(selectedColor)) {
+            background = WidgetAppearance.noteColor(selectedColor,true);
+        }
+        editorRoot.setBackgroundColor(background);
+        getWindow().setStatusBarColor(background);
+    }
+
+    private void requestClose() {
+        if (saving) return;
+        if (noteId < 1 && title.getText().toString().trim().isEmpty()
+            && body.getText().toString().trim().isEmpty()) {
+            boolean content=false;
+            for (ItemRow row:items) if (!row.text.getText().toString().trim().isEmpty()) {
+                content=true;
+                break;
+            }
+            if (!content) { finish(); return; }
+        }
+        submit();
+    }
+
+    @Override @Deprecated public void onBackPressed() {
+        requestClose();
+    }
+
+    private int firstCompletedIndex() {
+        int i=0;
+        while(i<items.size() && !items.get(i).checked.isChecked()) i++;
+        return i;
+    }
+
+    private void refreshCompletedGroup() {
+        if (completedHost==null || completedHeader==null) return;
+        int completed=0;
+        for(ItemRow row:items) if(row.checked.isChecked()) completed++;
+        completedHeader.setVisibility(isChecklist && completed>0?View.VISIBLE:View.GONE);
+        completedHeader.setText((showCompleted?"▾ ":"▸ ")+
+            "("+completed+") Completed items");
+        completedHost.setVisibility(showCompleted?View.VISIBLE:View.GONE);
+    }
+
+    private void onCheckChanged(ItemRow row) {
+        if (itemHost == null || completedHost == null) return;
+        row.text.setPaintFlags(row.text.getPaintFlags() &
+            ~Paint.STRIKE_THRU_TEXT_FLAG |
+            (row.checked.isChecked()?Paint.STRIKE_THRU_TEXT_FLAG:0));
+        row.text.setTextColor(row.checked.isChecked()?0xff99999e:0xffe7e7eb);
+        if (!items.contains(row)) return;
+        items.remove(row);
+        int insert= row.checked.isChecked()?items.size():firstCompletedIndex();
+        items.add(insert,row);
+        android.view.ViewGroup previous = (android.view.ViewGroup)row.line.getParent();
+        if(previous!=null)previous.removeView(row.line);
+        LinearLayout host=row.checked.isChecked()?completedHost:itemHost;
+        host.addView(row.line,new LinearLayout.LayoutParams(-1,ScreenUi.dp(this,57)));
+        refreshCompletedGroup();
+    }
+
+    private boolean onChecklistDrag(DragEvent event,boolean completed) {
+        switch(event.getAction()) {
+            case DragEvent.ACTION_DRAG_STARTED:
+                return event.getLocalState() instanceof ItemRow;
+            case DragEvent.ACTION_DROP: {
+                ItemRow dragged = (ItemRow)event.getLocalState();
+                if(dragged==null || dragged.checked.isChecked()!=completed) return false;
+                LinearLayout host=completed?completedHost:itemHost;
+                int newIndex=0;
+                for(int i=0;i<host.getChildCount();i++) {
+                    View child=host.getChildAt(i);
+                    if(child==dragged.line)continue;
+                    if(event.getY()>child.getTop()+child.getHeight()/2f)newIndex++;
+                }
+                items.remove(dragged);
+                int beforeCompleted=0;
+                for(ItemRow item:items)if(!item.checked.isChecked())beforeCompleted++;
+                int within=completed?items.size()-beforeCompleted:beforeCompleted;
+                int insert=(completed?beforeCompleted:0)+Math.min(within,newIndex);
+                items.add(insert,dragged);
+                host.removeView(dragged.line);
+                host.addView(dragged.line,Math.min(newIndex,host.getChildCount()));
+                return true;
+            }
+            default: return true;
+        }
+    }
+
     private void updateType() {
         body.setVisibility(isChecklist ? View.GONE : View.VISIBLE);
         itemHost.setVisibility(isChecklist ? View.VISIBLE : View.GONE);
         addItem.setVisibility(isChecklist ? View.VISIBLE : View.GONE);
-        if (isChecklist && items.isEmpty()) addRow(null);
+        if(isChecklist && items.isEmpty()) insertRow(null,0,false);
+        refreshCompletedGroup();
     }
 
     private void load() {
@@ -179,7 +427,8 @@ public class NoteEditorActivity extends Activity {
         original=note;
         isChecklist=note.optBoolean("isCbox");
         title.setText(KeptApi.plain(note.optString("noteTitle")));
-        pinned.setChecked(note.optBoolean("pinned"));
+        isPinned = note.optBoolean("pinned");
+        updatePinVisual();
         chosenLabels=note.optJSONArray("labels");
         if(chosenLabels==null)chosenLabels=new JSONArray();
         String color=note.optString("bgColor","#FFFFFF");
@@ -197,9 +446,9 @@ public class NoteEditorActivity extends Activity {
             JSONObject entry=checks.optJSONObject(i);
             if(entry!=null)addRow(entry);
         }
-        status.setText(offline?"Offline copy • edits will be queued for safe sync":
-            (isChecklist?"Tap checkboxes to complete items.":"Edit your note below."));
-        labelsButton.setText("🏷 Labels ("+chosenLabels.length()+")");
+        status.setText(offline?"Offline copy • changes will sync when online":"");
+        labelsButton.setText("Labels ("+chosenLabels.length()+")");
+        applyEditorColor();
         updateType();
     }
 
@@ -377,7 +626,7 @@ public class NoteEditorActivity extends Activity {
                     payload.put("isCbox", isChecklist);
                     payload.put("images", new JSONArray());
                     payload.put("labels", chosenLabels);
-                    payload.put("pinned", pinned.isChecked());
+                    payload.put("pinned", isPinned);
                     if (colorTouched) payload.put("bgColor",selectedColor);
                     payload.put("syncId","keptwidget-"+java.util.UUID.randomUUID());
                     try {
@@ -401,8 +650,8 @@ public class NoteEditorActivity extends Activity {
                     } else if (!bodyText.equals(KeptApi.plain(before.optString("noteBody")))) {
                         payload.put("noteBody", KeptApi.toHtml(bodyText));
                     }
-                    if (pinned.isChecked() != before.optBoolean("pinned"))
-                        payload.put("pinned",pinned.isChecked());
+                    if (isPinned != before.optBoolean("pinned"))
+                        payload.put("pinned",isPinned);
                     if (colorTouched) payload.put("bgColor",selectedColor);
                     if (labelsTouched) payload.put("labels",chosenLabels);
                     if (payload.length() != 0) {
@@ -441,7 +690,7 @@ public class NoteEditorActivity extends Activity {
             .setItems(names,(dialog,index)-> {
                 selectedColor=values[index];
                 colorTouched=true;
-                colorButton.setText("🎨 " + names[index]);
+                applyEditorColor();
             }).show();
     }
 
