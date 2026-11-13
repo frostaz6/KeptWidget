@@ -411,7 +411,7 @@ public class NoteEditorActivity extends Activity {
         body.setVisibility(isChecklist ? View.GONE : View.VISIBLE);
         itemHost.setVisibility(isChecklist ? View.VISIBLE : View.GONE);
         addItem.setVisibility(isChecklist ? View.VISIBLE : View.GONE);
-        if(isChecklist && items.isEmpty()) insertRow(null,0,false);
+        if(isChecklist && items.isEmpty()) insertRow(null,0,noteId<0);
         refreshCompletedGroup();
     }
 
