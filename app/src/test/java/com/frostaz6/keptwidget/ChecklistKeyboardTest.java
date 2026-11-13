@@ -45,4 +45,12 @@ public final class ChecklistKeyboardTest {
         assertEquals("",split.first);
         assertEquals("",split.second);
     }
+    @Test public void preserveExistingEmptyChecklistEntries() {
+        org.junit.Assert.assertTrue(NoteEditorActivity.shouldPersistRow("",true));
+        org.junit.Assert.assertTrue(NoteEditorActivity.shouldPersistRow("  ",true));
+        org.junit.Assert.assertFalse(NoteEditorActivity.shouldPersistRow("",false));
+        org.junit.Assert.assertFalse(NoteEditorActivity.shouldPersistRow(" ",false));
+        org.junit.Assert.assertTrue(NoteEditorActivity.shouldPersistRow("Rx",false));
+    }
+
 }
