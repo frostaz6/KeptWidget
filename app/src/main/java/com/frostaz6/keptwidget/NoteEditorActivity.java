@@ -360,31 +360,34 @@ public class NoteEditorActivity extends Activity {
     }
 
     private boolean onChecklistDrag(DragEvent event,boolean completed) {
-        switch(event.getAction()) {
-            case DragEvent.ACTION_DRAG_STARTED:
-                return event.getLocalState() instanceof ItemRow;
-            case DragEvent.ACTION_DROP: {
-                ItemRow dragged = (ItemRow)event.getLocalState();
-                if(dragged==null || dragged.checked.isChecked()!=completed) return false;
-                LinearLayout host=completed?completedHost:itemHost;
-                int newIndex=0;
-                for(int i=0;i<host.getChildCount();i++) {
-                    View child=host.getChildAt(i);
-                    if(child==dragged.line)continue;
-                    if(event.getY()>child.getTop()+child.getHeight()/2f)newIndex++;
-                }
-                items.remove(dragged);
-                int beforeCompleted=0;
-                for(ItemRow item:items)if(!item.checked.isChecked())beforeCompleted++;
-                int within=completed?items.size()-beforeCompleted:beforeCompleted;
-                int insert=(completed?beforeCompleted:0)+Math.min(within,newIndex);
-                items.add(insert,dragged);
-                host.removeView(dragged.line);
-                host.addView(dragged.line,Math.min(newIndex,host.getChildCount()));
-                return true;
-            }
-            default: return true;
+        if(event.getAction()==DragEvent.ACTION_DRAG_STARTED)
+            return event.getLocalState() instanceof ItemRow;
+        if(event.getAction()==DragEvent.ACTION_DROP &&
+            event.getLocalState() instanceof ItemRow)
+            return dropChecklistItem((ItemRow)event.getLocalState(),completed,
+                event.getY());
+        return true;
+    }
+
+    /** Only reorder within a completion group; never change a checkbox by dragging. */
+    private boolean dropChecklistItem(ItemRow dragged,boolean completed,float y) {
+        if(dragged==null || dragged.checked.isChecked()!=completed)return false;
+        LinearLayout host=completed?completedHost:itemHost;
+        int newIndex=0;
+        for(int i=0;i<host.getChildCount();i++) {
+            View child=host.getChildAt(i);
+            if(child==dragged.line)continue;
+            if(y>child.getTop()+child.getHeight()/2f)newIndex++;
         }
+        items.remove(dragged);
+        int unfinished=0;
+        for(ItemRow item:items)if(!item.checked.isChecked())unfinished++;
+        int within=completed?items.size()-unfinished:unfinished;
+        int insert=(completed?unfinished:0)+Math.min(within,newIndex);
+        items.add(insert,dragged);
+        host.removeView(dragged.line);
+        host.addView(dragged.line,Math.min(newIndex,host.getChildCount()));
+        return true;
     }
 
     private void updateType() {
@@ -490,80 +493,129 @@ public class NoteEditorActivity extends Activity {
         next.text.setSelection(0);
     }
 
-    private ItemRow insertRow(JSONObject existing, int index, boolean focus) {
-        LinearLayout line = new LinearLayout(this);
+    private ItemRow insertRow(JSONObject existing,int index,boolean focus) {
+        LinearLayout line=new LinearLayout(this);
         line.setOrientation(LinearLayout.HORIZONTAL);
         line.setGravity(Gravity.CENTER_VERTICAL);
-        CheckBox checked = new CheckBox(this);
-        checked.setChecked(existing != null && existing.optBoolean("done"));
-        line.addView(checked, new LinearLayout.LayoutParams(ScreenUi.dp(this,48),
-            LinearLayout.LayoutParams.WRAP_CONTENT));
+        line.setMinimumHeight(ScreenUi.dp(this,57));
 
-        EditText edit = ScreenUi.field(this, "List item", InputType.TYPE_CLASS_TEXT |
+        ImageButton grip=icon(R.drawable.ic_editor_drag,"Long press and drag to reorder");
+        grip.setColorFilter(0xffbcbcc1);
+        line.addView(grip,new LinearLayout.LayoutParams(ScreenUi.dp(this,35),
+            ScreenUi.dp(this,48)));
+
+        CheckBox checked=new CheckBox(this);
+        checked.setChecked(existing!=null && existing.optBoolean("done"));
+        checked.setButtonTintList(new ColorStateList(
+            new int[][] {new int[]{android.R.attr.state_checked},new int[]{}},
+            new int[]{0xffd6e3ba,0xffc6c6cb}));
+        checked.setPadding(0,0,0,0);
+        line.addView(checked,new LinearLayout.LayoutParams(ScreenUi.dp(this,44),
+            ScreenUi.dp(this,46)));
+
+        EditText edit=ScreenUi.field(this,"List item",InputType.TYPE_CLASS_TEXT |
             InputType.TYPE_TEXT_FLAG_CAP_SENTENCES);
-        // ScreenUi.field sets the input type last; enforce single-line behavior
-        // again so Android/Samsung keyboards offer Next rather than Return.
         edit.setSingleLine(true);
         edit.setMaxLines(1);
-        edit.setImeOptions(EditorInfo.IME_ACTION_NEXT | EditorInfo.IME_FLAG_NO_EXTRACT_UI);
-        edit.setText(existing == null ? "" : KeptApi.plain(existing.optString("data")));
-        line.addView(edit, new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f));
+        edit.setTextSize(16);
+        edit.setImeOptions(EditorInfo.IME_ACTION_NEXT |
+            EditorInfo.IME_FLAG_NO_EXTRACT_UI);
+        edit.setTextColor(0xffe7e7eb);
+        edit.setHintTextColor(0xff8d8d92);
+        edit.setBackgroundColor(Color.TRANSPARENT);
+        edit.setPadding(ScreenUi.dp(this,2),ScreenUi.dp(this,11),
+            ScreenUi.dp(this,3),ScreenUi.dp(this,11));
+        edit.setText(existing==null?"":KeptApi.plain(existing.optString("data")));
+        line.addView(edit,new LinearLayout.LayoutParams(0,
+            ScreenUi.dp(this,52),1f));
 
-        Button remove = ScreenUi.button(this, "×", false);
-        line.addView(remove, new LinearLayout.LayoutParams(ScreenUi.dp(this,42),
-            ScreenUi.dp(this,42)));
+        TextView remove=ScreenUi.label(this,"×",24,false);
+        remove.setGravity(Gravity.CENTER);
+        remove.setTextColor(0xffc5c5ca);
+        remove.setContentDescription("Remove checklist item");
+        remove.setVisibility(View.GONE);
+        line.addView(remove,new LinearLayout.LayoutParams(ScreenUi.dp(this,38),
+            ScreenUi.dp(this,52)));
 
-        long id = existing == null ? ITEM_IDS.incrementAndGet()
-            : existing.optLong("id", ITEM_IDS.incrementAndGet());
-        ItemRow row = new ItemRow(checked, edit, id, existing);
+        long id=existing==null?ITEM_IDS.incrementAndGet():
+            existing.optLong("id",ITEM_IDS.incrementAndGet());
+        ItemRow row=new ItemRow(checked,edit,line,id,existing);
 
-        // Physical/Bluetooth keyboards deliver Enter as a key event. Handle it
-        // before TextView's default newline/focus-navigation behavior.
-        edit.setOnKeyListener((v, keyCode, event) -> {
-            if (keyCode != KeyEvent.KEYCODE_ENTER || event.isShiftPressed()) return false;
-            if (event.getAction() == KeyEvent.ACTION_DOWN && event.getRepeatCount() == 0)
-                insertNextRow(row);
+        // Samsung IME sends NEXT; a Bluetooth keyboard can send physical Enter.
+        edit.setOnKeyListener((v,keyCode,event)-> {
+            if(keyCode!=KeyEvent.KEYCODE_ENTER || event.isShiftPressed())return false;
+            if(event.getAction()==KeyEvent.ACTION_DOWN &&
+                event.getRepeatCount()==0)insertNextRow(row);
             return true;
         });
-
-        // Soft keyboards usually send IME_ACTION_NEXT without a KeyEvent.
-        edit.setOnEditorActionListener((v, actionId, event) -> {
-            if (event != null) {
-                if (event.getKeyCode() != KeyEvent.KEYCODE_ENTER || event.isShiftPressed())
-                    return false;
-                if (event.getAction() == KeyEvent.ACTION_DOWN && event.getRepeatCount() == 0)
-                    insertNextRow(row);
-                return true; // Consume KEY_UP too; never insert a line break.
+        edit.setOnEditorActionListener((v,actionId,event)-> {
+            if(event!=null){
+                if(event.getKeyCode()!=KeyEvent.KEYCODE_ENTER ||
+                    event.isShiftPressed())return false;
+                if(event.getAction()==KeyEvent.ACTION_DOWN &&
+                    event.getRepeatCount()==0)insertNextRow(row);
+                return true;
             }
-            if (actionId == EditorInfo.IME_ACTION_NEXT ||
-                actionId == EditorInfo.IME_ACTION_DONE ||
-                actionId == EditorInfo.IME_ACTION_GO ||
-                actionId == EditorInfo.IME_ACTION_UNSPECIFIED ||
-                actionId == EditorInfo.IME_NULL) {
+            if(actionId==EditorInfo.IME_ACTION_NEXT ||
+               actionId==EditorInfo.IME_ACTION_DONE ||
+               actionId==EditorInfo.IME_ACTION_GO ||
+               actionId==EditorInfo.IME_ACTION_UNSPECIFIED ||
+               actionId==EditorInfo.IME_NULL){
                 insertNextRow(row);
                 return true;
             }
             return false;
         });
+        edit.setOnFocusChangeListener((v,hasFocus)->remove.setVisibility(
+            hasFocus?View.VISIBLE:View.GONE));
 
-        int target = Math.max(0, Math.min(index, items.size()));
-        items.add(target, row);
-        itemHost.addView(line, target, ScreenUi.margins(this,0,0,0,6));
-        remove.setOnClickListener(v -> {
+        int target=Math.max(0,Math.min(index,items.size()));
+        int groupIndex=0;
+        for(int j=0;j<target;j++){
+            if(items.get(j).checked.isChecked()==checked.isChecked())groupIndex++;
+        }
+        items.add(target,row);
+        LinearLayout host=checked.isChecked()?completedHost:itemHost;
+        host.addView(line,Math.min(groupIndex,host.getChildCount()),
+            new LinearLayout.LayoutParams(-1,ScreenUi.dp(this,57)));
+
+        checked.setOnCheckedChangeListener((button,done)->onCheckChanged(row));
+        if(checked.isChecked()){
+            edit.setPaintFlags(edit.getPaintFlags()|Paint.STRIKE_THRU_TEXT_FLAG);
+            edit.setTextColor(0xff99999e);
+        }
+        remove.setOnClickListener(v-> {
             items.remove(row);
-            itemHost.removeView(line);
+            LinearLayout parent=(LinearLayout)line.getParent();
+            if(parent!=null)parent.removeView(line);
+            refreshCompletedGroup();
         });
 
-        if (focus) {
+        grip.setOnLongClickListener(v->{
+            ClipData clip=ClipData.newPlainText("Kept checklist row","");
+            line.startDragAndDrop(clip,new View.DragShadowBuilder(line),row,0);
+            return true;
+        });
+        line.setOnDragListener((view,event)->{
+            if(event.getAction()==DragEvent.ACTION_DRAG_STARTED)
+                return event.getLocalState() instanceof ItemRow;
+            if(event.getAction()==DragEvent.ACTION_DROP &&
+                event.getLocalState() instanceof ItemRow) {
+                return dropChecklistItem((ItemRow)event.getLocalState(),
+                    checked.isChecked(),event.getY()+line.getTop());
+            }
+            return true;
+        });
+
+        refreshCompletedGroup();
+        if(focus){
             edit.requestFocus();
-            // The existing soft keyboard stays visible; explicitly show it if
-            // the user created a row using the on-screen Add button.
-            edit.post(() -> {
+            edit.post(()->{
                 edit.requestFocus();
-                android.view.inputmethod.InputMethodManager keyboard =
+                android.view.inputmethod.InputMethodManager keyboard=
                     (android.view.inputmethod.InputMethodManager)
                         getSystemService(INPUT_METHOD_SERVICE);
-                if (keyboard != null) keyboard.showSoftInput(edit,
+                if(keyboard!=null)keyboard.showSoftInput(edit,
                     android.view.inputmethod.InputMethodManager.SHOW_IMPLICIT);
             });
         }
