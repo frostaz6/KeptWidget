@@ -340,9 +340,13 @@ public class NoteEditorActivity extends Activity {
     }
 
     private int firstCompletedIndex() {
-        int i=0;
-        while(i<items.size() && !items.get(i).checked.isChecked()) i++;
-        return i;
+        // Older Kept notes may interleave checked and unchecked JSON rows.
+        // Insert after the last unchecked item rather than at the first checked
+        // entry, so a new item appears at the end of the visible active group.
+        int index=0;
+        for(int i=0;i<items.size();i++)
+            if(!items.get(i).checked.isChecked()) index=i+1;
+        return index;
     }
 
     private void refreshCompletedGroup() {
