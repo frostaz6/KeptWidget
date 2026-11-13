@@ -93,6 +93,7 @@ public class NoteEditorActivity extends Activity {
 
         editorRoot = new LinearLayout(this);
         editorRoot.setOrientation(LinearLayout.VERTICAL);
+        editorRoot.setFitsSystemWindows(true);
         editorRoot.setBackgroundColor(0xff1c1c1f);
         setContentView(editorRoot);
 
@@ -622,6 +623,11 @@ public class NoteEditorActivity extends Activity {
         return row;
     }
 
+    /** Keep existing empty list entries; drop only never-edited new placeholders. */
+    static boolean shouldPersistRow(String text, boolean existedOnServer) {
+        return existedOnServer || (text != null && !text.trim().isEmpty());
+    }
+
     private JSONArray currentItems() throws Exception {
         JSONArray result = new JSONArray();
         for (ItemRow row : items) {
@@ -629,7 +635,7 @@ public class NoteEditorActivity extends Activity {
             // Existing blank checklist entries are valid Kept data: never delete
             // them simply because the user opened the note and saved it.
             // Newly-created empty placeholders are not written until edited.
-            if (text.isEmpty() && row.original == null) continue;
+            if (!shouldPersistRow(text, row.original != null)) continue;
             JSONObject entry = row.original == null ? new JSONObject()
                 : new JSONObject(row.original.toString());
             entry.put("id", row.id);
