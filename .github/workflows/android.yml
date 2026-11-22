@@ -62,7 +62,7 @@ jobs:
         if: ${{ env.RELEASE_KEY_PRESENT == 'true' && (github.ref == 'refs/heads/main' || (github.event_name == 'push' && github.ref == 'refs/heads/develop/v0.4')) }}
         uses: actions/upload-artifact@v4
         with:
-          name: KeptWidget-0.4.0-beta1-signed-APK
+          name: KeptWidget-0.4.0-beta2-signed-APK
           path: app/build/outputs/apk/release/app-release.apk
           if-no-files-found: error
       - name: Explain missing signing configuration
