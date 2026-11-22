@@ -10,6 +10,9 @@ permissions:
 
 jobs:
   build:
+    # A push to develop/v0.4 also emits a pull_request event; test once per
+    # commit to avoid parallel Gradle/Robolectric downloads and Maven 429s.
+    if: ${{ github.event_name != 'pull_request' || github.head_ref != 'develop/v0.4' }}
     runs-on: ubuntu-latest
     env:
       RELEASE_KEY_PRESENT: "${{ secrets.KEPTWIDGET_KEYSTORE_B64 != '' && secrets.KEPTWIDGET_KEYSTORE_PASSWORD != '' }}"
@@ -28,7 +31,12 @@ jobs:
           test -n "$SDKMANAGER"
           "$SDKMANAGER" --install "platforms;android-35" "build-tools;35.0.0"
       - name: Run widget formatting and sync tests
-        run: gradle --no-daemon :app:testDebugUnitTest
+        run: |
+          for attempt in 1 2 3; do
+            if gradle --no-daemon :app:testDebugUnitTest; then exit 0; fi
+            if [ "$attempt" -eq 3 ]; then exit 1; fi
+            sleep $((15 * attempt))
+          done
       - name: Build debug APK (testing only; not upgrade-stable)
         run: gradle --no-daemon :app:assembleDebug
       - name: Upload debug APK
