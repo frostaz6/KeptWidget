@@ -55,6 +55,12 @@ public class NoteEditorActivity extends Activity {
     private LinearLayout itemHost, completedHost, editorRoot;
     private ScrollView editorScroll;
     private TextView completedHeader, editedStamp;
+    private LinearLayout undoBar;
+    private TextView undoMessage;
+    private ItemRow removedRow;
+    private int removedPosition;
+    private final android.os.Handler undoHandler=new android.os.Handler(android.os.Looper.getMainLooper());
+    private Runnable hideUndo;
     private boolean showCompleted = false;
     private ImageButton pinButton;
     private Button save, addItem, labelsButton;
@@ -113,6 +119,7 @@ public class NoteEditorActivity extends Activity {
 
         ImageButton back = icon(R.drawable.ic_editor_back, "Back and save note");
         toolbar.addView(back,iconParams());
+        back.setBackgroundColor(Color.TRANSPARENT);
         back.setOnClickListener(v -> requestClose());
         toolbar.addView(new View(this),new LinearLayout.LayoutParams(0,1,1f));
 
@@ -202,6 +209,23 @@ public class NoteEditorActivity extends Activity {
         itemHost.setOnDragListener((view,event) -> onChecklistDrag(event,false));
         completedHost.setOnDragListener((view,event) -> onChecklistDrag(event,true));
 
+        undoBar=new LinearLayout(this);
+        undoBar.setOrientation(LinearLayout.HORIZONTAL);
+        undoBar.setGravity(Gravity.CENTER_VERTICAL);
+        undoBar.setBackgroundColor(0xff343b3a);
+        undoBar.setPadding(ScreenUi.dp(this,16),ScreenUi.dp(this,4),
+            ScreenUi.dp(this,12),ScreenUi.dp(this,4));
+        undoBar.setVisibility(View.GONE);
+        editorRoot.addView(undoBar,new LinearLayout.LayoutParams(-1,ScreenUi.dp(this,51)));
+        undoMessage=ScreenUi.label(this,"Checklist item removed",14,false);
+        undoMessage.setTextColor(0xffefefe9);
+        undoBar.addView(undoMessage,new LinearLayout.LayoutParams(0,-2,1f));
+        Button undo=ScreenUi.button(this,"UNDO",false);
+        undo.setTextColor(0xffc9ef98);
+        undo.setBackgroundColor(Color.TRANSPARENT);
+        undoBar.addView(undo,new LinearLayout.LayoutParams(ScreenUi.dp(this,88),ScreenUi.dp(this,45)));
+        undo.setOnClickListener(v->restoreRemovedRow());
+
         LinearLayout bottom = new LinearLayout(this);
         bottom.setGravity(Gravity.CENTER_VERTICAL);
         bottom.setPadding(ScreenUi.dp(this,14),ScreenUi.dp(this,5),
@@ -265,7 +289,10 @@ public class NoteEditorActivity extends Activity {
     private ImageButton icon(int drawable,String accessibility) {
         ImageButton button = new ImageButton(this);
         button.setImageResource(drawable);
-        button.setBackgroundColor(Color.TRANSPARENT);
+        GradientDrawable control=new GradientDrawable();
+        control.setColor(0xff34353b);
+        control.setCornerRadius(ScreenUi.dp(this,13));
+        button.setBackground(control);
         button.setColorFilter(0xffd5d5da);
         button.setPadding(ScreenUi.dp(this,9),ScreenUi.dp(this,9),
             ScreenUi.dp(this,9),ScreenUi.dp(this,9));
@@ -456,6 +483,7 @@ public class NoteEditorActivity extends Activity {
     }
 
     @Override protected void onDestroy() {
+        if(hideUndo!=null)undoHandler.removeCallbacks(hideUndo);
         if (android.os.Build.VERSION.SDK_INT >= 33 && backCallback != null)
             getOnBackInvokedDispatcher().unregisterOnBackInvokedCallback(backCallback);
         super.onDestroy();
@@ -496,6 +524,36 @@ public class NoteEditorActivity extends Activity {
         LinearLayout host=row.checked.isChecked()?completedHost:itemHost;
         host.addView(row.line,new LinearLayout.LayoutParams(-1,ScreenUi.dp(this,57)));
         refreshCompletedGroup();
+    }
+
+    private void offerUndo(ItemRow row) {
+        removedRow=row;
+        undoBar.setVisibility(View.VISIBLE);
+        if(hideUndo!=null)undoHandler.removeCallbacks(hideUndo);
+        hideUndo=()->{
+            removedRow=null;
+            undoBar.setVisibility(View.GONE);
+        };
+        undoHandler.postDelayed(hideUndo,6000L);
+    }
+
+    private void restoreRemovedRow() {
+        ItemRow row=removedRow;
+        if(row==null)return;
+        if(hideUndo!=null)undoHandler.removeCallbacks(hideUndo);
+        removedRow=null;
+        undoBar.setVisibility(View.GONE);
+        int index=Math.max(0,Math.min(removedPosition,items.size()));
+        int groupIndex=0;
+        for(int j=0;j<index;j++) {
+            if(items.get(j).checked.isChecked()==row.checked.isChecked())groupIndex++;
+        }
+        items.add(index,row);
+        LinearLayout host=row.checked.isChecked()?completedHost:itemHost;
+        host.addView(row.line,Math.min(groupIndex,host.getChildCount()),
+            new LinearLayout.LayoutParams(-1,ScreenUi.dp(this,57)));
+        refreshCompletedGroup();
+        row.text.requestFocus();
     }
 
     private boolean onChecklistDrag(DragEvent event,boolean completed) {
@@ -643,6 +701,7 @@ public class NoteEditorActivity extends Activity {
 
         ImageButton grip=icon(R.drawable.ic_editor_drag,"Long press and drag to reorder");
         grip.setColorFilter(0xffbcbcc1);
+        grip.setBackgroundColor(Color.TRANSPARENT);
         line.addView(grip,new LinearLayout.LayoutParams(ScreenUi.dp(this,35),
             ScreenUi.dp(this,48)));
 
@@ -727,10 +786,13 @@ public class NoteEditorActivity extends Activity {
             edit.setTextColor(0xff99999e);
         }
         remove.setOnClickListener(v-> {
+            removedPosition=items.indexOf(row);
+            if(removedPosition<0)return;
             items.remove(row);
             LinearLayout parent=(LinearLayout)line.getParent();
             if(parent!=null)parent.removeView(line);
             refreshCompletedGroup();
+            offerUndo(row);
         });
 
         grip.setOnLongClickListener(v->{
