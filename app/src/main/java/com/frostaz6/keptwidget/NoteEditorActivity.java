@@ -887,16 +887,49 @@ public class NoteEditorActivity extends Activity {
             }
         });
     }
+    /** Material-like color swatches instead of a text-only color picker. */
     private void pickColor() {
-        final String[] names = {"Default","Red","Orange","Yellow","Green","Blue","Lavender","Pink","Gray"};
-        final String[] values = {"#FFFFFF","#FADBD8","#FCE5CA","#FFF3BC","#DBEBD3",
-            "#D6EAF6","#E8DDF6","#F6DAE6","#E8E8E8"};
-        new AlertDialog.Builder(this).setTitle("Note color")
-            .setItems(names,(dialog,index)-> {
-                selectedColor=values[index];
+        final String[] names={"Default","Coral","Peach","Sand","Yellow",
+            "Mint","Sage","Blue","Lavender","Pink","Slate","Gray"};
+        final String[] values={"#FFFFFF","#FADBD8","#FCE5CA","#F6E3CE",
+            "#FFF3BC","#DBEBD3","#CDE4CF","#D6EAF6","#E8DDF6",
+            "#F6DAE6","#D6DDE2","#E8E8E8"};
+        GridLayout colors=new GridLayout(this);
+        colors.setColumnCount(4);
+        colors.setAlignmentMode(GridLayout.ALIGN_BOUNDS);
+        colors.setPadding(ScreenUi.dp(this,12),ScreenUi.dp(this,12),
+            ScreenUi.dp(this,12),ScreenUi.dp(this,12));
+        AlertDialog dialog=new AlertDialog.Builder(this)
+            .setTitle("Background color")
+            .setView(colors)
+            .setNegativeButton("Cancel",null)
+            .create();
+        for(int i=0;i<values.length;i++){
+            final int item=i;
+            final int selected=WidgetAppearance.noteColor(values[i],true);
+            ImageButton swatch=new ImageButton(this);
+            swatch.setContentDescription(names[i]+" note color");
+            swatch.setImageDrawable(null);
+            GradientDrawable circle=new GradientDrawable();
+            circle.setShape(GradientDrawable.OVAL);
+            circle.setColor(selected);
+            circle.setStroke(ScreenUi.dp(this,values[i].equalsIgnoreCase(selectedColor)?3:1),
+                values[i].equalsIgnoreCase(selectedColor)?0xfff5f5ed:0xff85858a);
+            swatch.setBackground(circle);
+            GridLayout.LayoutParams params=new GridLayout.LayoutParams();
+            params.width=ScreenUi.dp(this,52);
+            params.height=ScreenUi.dp(this,52);
+            params.setMargins(ScreenUi.dp(this,6),ScreenUi.dp(this,6),
+                ScreenUi.dp(this,6),ScreenUi.dp(this,6));
+            colors.addView(swatch,params);
+            swatch.setOnClickListener(v->{
+                selectedColor=values[item];
                 colorTouched=true;
                 applyEditorColor();
-            }).show();
+                dialog.dismiss();
+            });
+        }
+        dialog.show();
     }
 
     private void pickLabels() {
