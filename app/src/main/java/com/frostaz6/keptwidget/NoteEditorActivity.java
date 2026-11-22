@@ -16,6 +16,7 @@ import android.graphics.Paint;
 import android.graphics.Typeface;
 import android.widget.ImageButton;
 import android.widget.FrameLayout;
+import android.widget.GridLayout;
 import android.widget.PopupMenu;
 import android.widget.ScrollView;
 import android.view.KeyEvent;
@@ -53,7 +54,7 @@ public class NoteEditorActivity extends Activity {
     private TextView status;
     private LinearLayout itemHost, completedHost, editorRoot;
     private ScrollView editorScroll;
-    private TextView completedHeader;
+    private TextView completedHeader, editedStamp;
     private boolean showCompleted = false;
     private ImageButton pinButton;
     private Button save, addItem, labelsButton;
@@ -231,7 +232,13 @@ public class NoteEditorActivity extends Activity {
             .setMessage("Rich-text formatting is available in the full Kept editor. Open it without altering this note?")
             .setNegativeButton("Stay here",null)
             .setPositiveButton("Open Kept",(dialog,which)->openKeptWeb()).show());
-        bottom.addView(new View(this),new LinearLayout.LayoutParams(0,1,1f));
+        editedStamp = ScreenUi.hint(this,noteId>0?"":"New note");
+        editedStamp.setTextColor(0xffbbbbbf);
+        editedStamp.setTextSize(12);
+        editedStamp.setGravity(Gravity.CENTER);
+        editedStamp.setMaxLines(1);
+        editedStamp.setEllipsize(android.text.TextUtils.TruncateAt.END);
+        bottom.addView(editedStamp,new LinearLayout.LayoutParams(0,-2,1f));
         ImageButton more = icon(R.drawable.ic_editor_more,"More note actions");
         bottom.addView(more,iconParams());
         more.setOnClickListener(this::showActionsMenu);
@@ -243,6 +250,16 @@ public class NoteEditorActivity extends Activity {
             updateType();
             maybeRestoreRecoveryDraft();
         }
+    }
+
+    private static String formatEdited(String timestamp) {
+        if(timestamp==null || timestamp.isBlank())return "Edited";
+        try {
+            java.time.Instant when=java.time.Instant.parse(timestamp);
+            java.time.ZonedDateTime date=when.atZone(java.time.ZoneId.systemDefault());
+            return "Edited " + java.time.format.DateTimeFormatter
+                .ofLocalizedTime(java.time.format.FormatStyle.SHORT).format(date);
+        }catch(Exception ignored){return "Edited";}
     }
 
     private ImageButton icon(int drawable,String accessibility) {
@@ -574,6 +591,8 @@ public class NoteEditorActivity extends Activity {
         status.setText(offline?"Offline copy • changes will sync when online":"");
         labelsButton.setText("Labels ("+chosenLabels.length()+")");
         applyEditorColor();
+        if(editedStamp!=null) editedStamp.setText(offline?"Offline draft":
+            formatEdited(note.optString("updatedAt","")));
         updateType();
         maybeRestoreRecoveryDraft();
     }
