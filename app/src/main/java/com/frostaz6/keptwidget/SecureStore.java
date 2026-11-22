@@ -47,6 +47,12 @@ final class SecureStore {
     static void saveNotes(Context c, String value) { write(c, "notes", value); }
     static String readPending(Context c) { return read(c,"pending"); }
     static void savePending(Context c,String data) { write(c,"pending",data); }
+    static String readDraft(Context c,String key) { return read(c,"draft_"+key); }
+    static void saveDraft(Context c,String key,String json) { write(c,"draft_"+key,json); }
+    static void clearDraft(Context c,String key) {
+        c.getApplicationContext().getSharedPreferences(PRIVATE_PREFS, Context.MODE_PRIVATE)
+            .edit().remove("draft_"+key).apply();
+    }
     static String singleNote(Context c, long id) { return read(c, "single_" + id); }
     static void saveSingleNote(Context c, long id, String value) { write(c, "single_" + id, value); }
 
