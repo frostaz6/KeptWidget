@@ -875,6 +875,14 @@ public class NoteEditorActivity extends Activity {
     }
 
     private void performSave(String titleText, String bodyText, JSONArray checks) {
+        // A process can be terminated while a save request is in flight.
+        // Keep a recovery snapshot until Kept confirms the write or our
+        // encrypted offline queue has accepted it.
+        try {
+            JSONObject draft=recoveryDraft();
+            if(containsUnsavedChanges(draft))
+                EditorDrafts.save(this,EditorDrafts.key(noteId,isChecklist),draft);
+        }catch(Exception ignored){}
         saving = true;
         save.setEnabled(false);
         status.setText("Saving…");
