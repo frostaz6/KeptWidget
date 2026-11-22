@@ -62,6 +62,7 @@ public class NoteEditorActivity extends Activity {
     private String selectedColor = "#FFFFFF";
     private JSONArray chosenLabels = new JSONArray();
     private boolean saving;
+    private boolean recoveryPromptShown;
     private android.window.OnBackInvokedCallback backCallback;
 
     private static final class ItemRow {
@@ -240,6 +241,7 @@ public class NoteEditorActivity extends Activity {
             title.setText(getIntent().getStringExtra(EXTRA_INITIAL_TITLE));
             body.setText(getIntent().getStringExtra(EXTRA_INITIAL_BODY));
             updateType();
+            maybeRestoreRecoveryDraft();
         }
     }
 
@@ -313,6 +315,109 @@ public class NoteEditorActivity extends Activity {
         }
         editorRoot.setBackgroundColor(background);
         getWindow().setStatusBarColor(background);
+    }
+
+    /**
+     * Preserve unsaved editor content locally whenever Android backgrounds or
+     * recreates the activity. This is a recovery snapshot, not a server save.
+     */
+    private JSONObject recoveryDraft() throws Exception {
+        JSONObject d = new JSONObject();
+        d.put("noteId",noteId);
+        d.put("isChecklist",isChecklist);
+        d.put("title",title.getText().toString());
+        d.put("body",body.getText().toString());
+        d.put("checkBoxes",currentItems());
+        d.put("pinned",isPinned);
+        d.put("color",selectedColor);
+        d.put("colorTouched",colorTouched);
+        d.put("labelsTouched",labelsTouched);
+        d.put("labels",chosenLabels);
+        d.put("baseline",original==null?JSONObject.NULL:new JSONObject(original.toString()));
+        return d;
+    }
+
+    private boolean containsUnsavedChanges(JSONObject d) {
+        if(noteId<=0) {
+            if(!d.optString("title").trim().isEmpty() ||
+                !d.optString("body").trim().isEmpty() || d.optBoolean("pinned") ||
+                d.optJSONArray("checkBoxes").length()>0)return true;
+            return colorTouched || labelsTouched;
+        }
+        if(original==null)return false;
+        if(!d.optString("title").trim().equals(KeptApi.plain(original.optString("noteTitle"))))
+            return true;
+        if(!d.optString("body").equals(KeptApi.formatted(original.optString("noteBody"))))
+            return true;
+        if(d.optBoolean("pinned")!=original.optBoolean("pinned"))return true;
+        if(colorTouched || labelsTouched)return true;
+        if(isChecklist) {
+            JSONArray prior=original.optJSONArray("checkBoxes");
+            JSONArray revised=d.optJSONArray("checkBoxes");
+            return !PendingSync.equivalent(prior==null?new JSONArray():prior,
+                revised==null?new JSONArray():revised);
+        }
+        return false;
+    }
+
+    @Override protected void onPause() {
+        // Store on pause, including rotations and switching away, so a crash
+        // or Android process eviction does not discard typed content.
+        if(!saving && title!=null && body!=null && (noteId<=0 || original!=null)) {
+            try {
+                JSONObject d=recoveryDraft();
+                String key=EditorDrafts.key(noteId,isChecklist);
+                if(containsUnsavedChanges(d)) EditorDrafts.save(this,key,d);
+                else EditorDrafts.clear(this,key);
+            }catch(Exception ignored){/* Keep the editor usable if storage is unavailable. */}
+        }
+        super.onPause();
+    }
+
+    private void maybeRestoreRecoveryDraft() {
+        if(recoveryPromptShown)return;
+        JSONObject d=EditorDrafts.load(this,EditorDrafts.key(noteId,isChecklist));
+        if(d==null)return;
+        recoveryPromptShown=true;
+        JSONObject baseline=d.optJSONObject("baseline");
+        boolean stale=noteId>0 && baseline!=null &&
+            !EditorDrafts.matchesBaseline(original,baseline);
+        new AlertDialog.Builder(this)
+            .setTitle(stale?"Server note changed":"Recover unsaved note?")
+            .setMessage(stale
+                ?"This note changed on Kept while an unfinished local edit existed. You can review the local draft, but conflicting changes will be blocked when saving."
+                :"KeptWidget found an unfinished local edit. Restore it instead of discarding what you typed?")
+            .setNegativeButton("Discard draft",(dialog,which)->
+                EditorDrafts.clear(this,EditorDrafts.key(noteId,isChecklist)))
+            .setPositiveButton("Review draft",(dialog,which)-> {
+                if(stale && baseline!=null) original=baseline;
+                applyRecoveryDraft(d);
+            })
+            .setCancelable(false)
+            .show();
+    }
+
+    private void applyRecoveryDraft(JSONObject d) {
+        title.setText(d.optString("title"));
+        body.setText(d.optString("body"));
+        isPinned=d.optBoolean("pinned");
+        updatePinVisual();
+        selectedColor=d.optString("color","#FFFFFF");
+        colorTouched=d.optBoolean("colorTouched");
+        labelsTouched=d.optBoolean("labelsTouched");
+        JSONArray labels=d.optJSONArray("labels");
+        chosenLabels=labels==null?new JSONArray():labels;
+        JSONArray recovered=d.optJSONArray("checkBoxes");
+        items.clear();
+        itemHost.removeAllViews();
+        completedHost.removeAllViews();
+        if(recovered!=null)for(int i=0;i<recovered.length();i++) {
+            JSONObject item=recovered.optJSONObject(i);
+            if(item!=null)addRow(item);
+        }
+        updateType();
+        applyEditorColor();
+        status.setText("Recovered draft • press Back to save to Kept");
     }
 
     private void requestClose() {
@@ -470,6 +575,7 @@ public class NoteEditorActivity extends Activity {
         labelsButton.setText("Labels ("+chosenLabels.length()+")");
         applyEditorColor();
         updateType();
+        maybeRestoreRecoveryDraft();
     }
 
     /** Restores an existing checklist item in its original order, without taking focus. */
@@ -711,6 +817,7 @@ public class NoteEditorActivity extends Activity {
                     } catch(java.io.IOException network) {
                         if(network instanceof KeptApi.ApiException)throw network;
                         PendingSync.create(this,payload);
+                        EditorDrafts.clear(this,EditorDrafts.key(id,isChecklist));
                         runOnUiThread(()->{
                             Toast.makeText(this,"Saved offline • will sync when online",Toast.LENGTH_LONG).show();
                             finish();
@@ -737,6 +844,7 @@ public class NoteEditorActivity extends Activity {
                         }catch(java.io.IOException network){
                             if(network instanceof KeptApi.ApiException)throw network;
                             PendingSync.edit(this,id,payload,before);
+                            EditorDrafts.clear(this,EditorDrafts.key(id,isChecklist));
                             runOnUiThread(()->{
                                 Toast.makeText(this,"Edit queued offline • sync resumes automatically",Toast.LENGTH_LONG).show();
                                 finish();
@@ -745,6 +853,7 @@ public class NoteEditorActivity extends Activity {
                         }
                     }
                 }
+                EditorDrafts.clear(this,EditorDrafts.key(id,isChecklist));
                 CollectionWidgetProvider.refreshAll(this);
                 runOnUiThread(() -> {
                     Toast.makeText(this, "Saved to Kept", Toast.LENGTH_SHORT).show();
