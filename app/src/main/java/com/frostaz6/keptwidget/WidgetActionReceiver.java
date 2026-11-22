@@ -14,12 +14,25 @@ public class WidgetActionReceiver extends BroadcastReceiver {
     static final String ACTION_ADD_NOTE = "com.frostaz6.keptwidget.ADD_NOTE";
     static final String ACTION_ADD_LIST = "com.frostaz6.keptwidget.ADD_LIST";
     static final String ACTION_REFRESH = "com.frostaz6.keptwidget.REFRESH";
+    static final String ACTION_TOGGLE_COMPLETED = "com.frostaz6.keptwidget.TOGGLE_COMPLETED";
     static final String EXTRA_ACTION = "row_action";
     static final String EXTRA_ITEM = "item_id";
 
     @Override public void onReceive(Context context, Intent intent) {
         if (intent == null) return;
         String action = intent.getAction();
+        if(ACTION_TOGGLE_COMPLETED.equals(action)) {
+            int widgetId=intent.getIntExtra(android.appwidget.AppWidgetManager.EXTRA_APPWIDGET_ID,
+                android.appwidget.AppWidgetManager.INVALID_APPWIDGET_ID);
+            if(widgetId!=android.appwidget.AppWidgetManager.INVALID_APPWIDGET_ID) {
+                String pref="show_completed_"+widgetId;
+                boolean old=SecureStore.preferences(context).getBoolean(pref,false);
+                SecureStore.preferences(context).edit().putBoolean(pref,!old).apply();
+                SingleNoteWidgetProvider.render(context,
+                    android.appwidget.AppWidgetManager.getInstance(context),widgetId);
+            }
+            return;
+        }
         if (ACTION_REFRESH.equals(action)) {
             CollectionWidgetProvider.refreshAll(context);
             return;

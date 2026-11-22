@@ -27,6 +27,8 @@ public final class SingleNoteWidgetProvider extends AppWidgetProvider {
         views.setTextColor(R.id.single_edit,WidgetAppearance.accent(dark));
         views.setTextColor(R.id.single_refresh,WidgetAppearance.muted(dark));
         views.setTextColor(R.id.single_empty,WidgetAppearance.muted(dark));
+        views.setTextColor(R.id.single_completed,WidgetAppearance.muted(dark));
+        views.setViewVisibility(R.id.single_completed,View.GONE);
         if(noteId>0){
             try {
                 String cached=SecureStore.singleNote(context,noteId);
@@ -61,14 +63,26 @@ public final class SingleNoteWidgetProvider extends AppWidgetProvider {
         views.setOnClickPendingIntent(R.id.single_refresh,
             PendingIntent.getBroadcast(context,id*12+4,refresh,
                 PendingIntent.FLAG_UPDATE_CURRENT|PendingIntent.FLAG_IMMUTABLE));
+        Intent completed=new Intent(context,WidgetActionReceiver.class)
+            .setAction(WidgetActionReceiver.ACTION_TOGGLE_COMPLETED)
+            .putExtra(AppWidgetManager.EXTRA_APPWIDGET_ID,id);
+        views.setOnClickPendingIntent(R.id.single_completed,
+            PendingIntent.getBroadcast(context,id*12+5,completed,
+                PendingIntent.FLAG_UPDATE_CURRENT|PendingIntent.FLAG_IMMUTABLE));
         manager.updateAppWidget(id,views);
         manager.notifyAppWidgetViewDataChanged(id,R.id.single_items);
     }
 
-    static void updateTitle(Context context,int widgetId,JSONObject note) {
+    static void updateTitle(Context context,int widgetId,JSONObject note,
+                            int completed,boolean showingCompleted,int visibleCount) {
         RemoteViews views=new RemoteViews(context.getPackageName(),R.layout.widget_single);
         views.setTextViewText(R.id.single_title,
             KeptApi.plain(note.optString("noteTitle","Untitled")));
+        views.setTextViewText(R.id.single_completed,
+            (showingCompleted ? "▾ " : "▸ ")+"("+completed+") Completed items");
+        views.setViewVisibility(R.id.single_completed,completed>0?View.VISIBLE:View.GONE);
+        views.setTextViewText(R.id.single_empty,visibleCount==0 ?
+            "All items completed. Tap below to show them." : "This note is empty.");
         AppWidgetManager.getInstance(context).partiallyUpdateAppWidget(widgetId,views);
     }
 
@@ -80,7 +94,8 @@ public final class SingleNoteWidgetProvider extends AppWidgetProvider {
 
     @Override public void onDeleted(Context context,int[] ids) {
         for(int id:ids) {
-            SecureStore.preferences(context).edit().remove("single_note_"+id).apply();
+            SecureStore.preferences(context).edit().remove("single_note_"+id)
+                .remove("show_completed_"+id).apply();
             WidgetAppearance.clear(context,id);
         }
     }

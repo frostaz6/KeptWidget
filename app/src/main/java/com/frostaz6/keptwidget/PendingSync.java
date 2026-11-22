@@ -38,7 +38,7 @@ final class PendingSync {
             .setConstraints(constraints)
             .setBackoffCriteria(BackoffPolicy.EXPONENTIAL,30,TimeUnit.SECONDS).build();
         WorkManager.getInstance(c.getApplicationContext()).enqueueUniqueWork(
-            "keptwidget-offline-sync",ExistingWorkPolicy.KEEP,work);
+            "keptwidget-offline-sync",ExistingWorkPolicy.APPEND_OR_REPLACE,work);
     }
 
     static JSONArray entries(Context c) {
@@ -117,7 +117,13 @@ final class PendingSync {
                    && "queued".equals(e.optString("state"))){existing=e;break;}
             }
             if(existing!=null){
-                existing.put("desired",!existing.optBoolean("desired"));
+                boolean next=!existing.optBoolean("desired");
+                if(existing.has("baselineDone") && next==existing.optBoolean("baselineDone")) {
+                    // Two offline taps cancel out instead of creating a needless mutation.
+                    a.remove(indexOf(a,existing.optString("id")));
+                } else {
+                    existing.put("desired",next);
+                }
                 save(c,a);
                 schedule(c);
                 return true;
@@ -133,6 +139,8 @@ final class PendingSync {
                     a.put(new JSONObject().put("id",UUID.randomUUID().toString())
                         .put("kind","check").put("state","queued")
                         .put("noteId",noteId).put("itemId",itemId)
+                        .put("baselineDone",item.optBoolean("done"))
+                        .put("baselineUpdatedAt",note.optString("updatedAt",""))
                         .put("desired",!item.optBoolean("done")));
                     save(c,a);
                     schedule(c);
@@ -141,6 +149,14 @@ final class PendingSync {
             }
             return false;
         }
+    }
+
+    private static int indexOf(JSONArray entries,String operationId) {
+        for(int i=0;i<entries.length();i++){
+            JSONObject e=entries.optJSONObject(i);
+            if(e!=null && operationId.equals(e.optString("id")))return i;
+        }
+        return -1;
     }
 
     static JSONObject cachedNote(Context c,long id) {
@@ -209,7 +225,7 @@ final class PendingSync {
         return output;
     }
 
-    static void discard(Context c,String operationId) {
+    private static void removeEntry(Context c,String operationId) {
         synchronized(LOCK){
             JSONArray original=entries(c),remaining=new JSONArray();
             for(int i=0;i<original.length();i++){
@@ -218,6 +234,10 @@ final class PendingSync {
             }
             save(c,remaining);
         }
+    }
+
+    static void discard(Context c,String operationId) {
+        removeEntry(c,operationId);
         CollectionWidgetProvider.refreshAll(c);
     }
 
@@ -295,22 +315,18 @@ final class PendingSync {
             return;
         }
         if("check".equals(kind)){
-            JSONArray boxes=current.optJSONArray("checkBoxes");
-            boolean found=false;
-            long itemId=op.getLong("itemId");
-            for(int i=0;boxes!=null&&i<boxes.length();i++){
-                JSONObject item=boxes.optJSONObject(i);
-                if(item!=null&&item.optLong("id",-1)==itemId){
-                    found=true;
-                    boolean desired=op.optBoolean("desired");
-                    if(item.optBoolean("done")!=desired){
-                        item.put("done",desired);
-                        KeptApi.patch(c,noteId,new JSONObject().put("checkBoxes",boxes));
-                    }
-                    break;
-                }
+            // A legacy operation without baselineDone can only be accepted if
+            // the server already matches the intended result.
+            Boolean baseline=op.has("baselineDone") ?
+                op.optBoolean("baselineDone") : null;
+            ChecklistMutation.Decision plan=ChecklistMutation.apply(
+                current.optJSONArray("checkBoxes"),op.getLong("itemId"),baseline,
+                op.optBoolean("desired"),op.optString("baselineUpdatedAt",""),
+                current.optString("updatedAt",""));
+            if(plan.isConflict())throw new Conflict(plan.conflict);
+            if(plan.needsWrite) {
+                KeptApi.patch(c,noteId,new JSONObject().put("checkBoxes",plan.items));
             }
-            if(!found)throw new Conflict("Checklist item was removed on the server.");
         }
     }
 
@@ -318,30 +334,53 @@ final class PendingSync {
         Conflict(String message){super(message);}
     }
 
-    /** Returns true when all remaining items are conflicts or have synced. */
+    /** Do not confuse transient API failures with a permanent edit conflict. */
+    static boolean shouldRetryHttp(int status) {
+        return status==408 || status==425 || status==429 || status>=500;
+    }
+
+    private static boolean hasQueued(Context c) {
+        JSONArray pending=entries(c);
+        for(int i=0;i<pending.length();i++){
+            JSONObject entry=pending.optJSONObject(i);
+            if(entry!=null && "queued".equals(entry.optString("state")))return true;
+        }
+        return false;
+    }
+
+    /** True means all queued work is complete (or awaiting manual conflict review). */
     static boolean flush(Context c) {
         if(!RUNNING.compareAndSet(false,true))return true;
         boolean online=true;
         try{
-            JSONArray pending=entries(c);
-            for(int i=0;i<pending.length();i++){
-                JSONObject op=pending.optJSONObject(i);
-                if(op==null||"conflict".equals(op.optString("state")))continue;
-                String id=op.optString("id");
-                try{
-                    applyOne(c,op);
-                    discard(c,id);
-                }catch(Conflict e){
-                    markConflict(c,id,e.getMessage());
-                }catch(KeptApi.ApiException e){
-                    if(e.status==401){online=false;break;}
-                    markConflict(c,id,"Kept rejected the change (HTTP "+e.status+"): "+e.getMessage());
-                }catch(IOException e){online=false;break;}
-                catch(Exception e){markConflict(c,id,e.getMessage());}
+            // Re-read the queue after every pass so edits enqueued during a sync
+            // are not stranded by a stale snapshot. Limit work per invocation.
+            for(int pass=0;pass<5 && online;pass++){
+                JSONArray snapshot=entries(c);
+                boolean attempted=false;
+                for(int i=0;i<snapshot.length();i++){
+                    JSONObject op=snapshot.optJSONObject(i);
+                    if(op==null || !"queued".equals(op.optString("state")))continue;
+                    attempted=true;
+                    String id=op.optString("id");
+                    try{
+                        applyOne(c,op);
+                        removeEntry(c,id);
+                    }catch(Conflict e){
+                        markConflict(c,id,e.getMessage());
+                    }catch(KeptApi.ApiException e){
+                        if(e.status==401 || shouldRetryHttp(e.status)){online=false;break;}
+                        markConflict(c,id,"Kept rejected the change (HTTP "+e.status+"): "+e.getMessage());
+                    }catch(IOException e){online=false;break;}
+                    catch(Exception e){markConflict(c,id,e.getMessage());}
+                }
+                if(!attempted)break;
             }
-        }finally{RUNNING.set(false);}
-        CollectionWidgetProvider.refreshAll(c);
-        return online;
+        }finally{
+            RUNNING.set(false);
+            CollectionWidgetProvider.refreshAll(c);
+        }
+        return online && !hasQueued(c);
     }
 
     /** A manual review is required for explicit conflicts. Never force-overwrite. */

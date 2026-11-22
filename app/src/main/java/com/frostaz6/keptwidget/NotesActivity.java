@@ -43,6 +43,8 @@ public final class NotesActivity extends Activity {
     private Spinner filter;
     private TextView hint;
     private boolean loading;
+    private boolean gridMode;
+    private Button layoutButton;
     private String activeFilter = "all";
 
     @Override public void onCreate(Bundle state) {
@@ -68,76 +70,148 @@ public final class NotesActivity extends Activity {
         super.onDestroy();
     }
 
+    /** Keep-like dark home screen: fixed search and capture surfaces around scrolling notes. */
     private void buildPage() {
-        ScrollView scroll = new ScrollView(this);
-        scroll.setBackgroundColor(BG);
-        root = new LinearLayout(this);
-        root.setOrientation(LinearLayout.VERTICAL);
-        root.setPadding(d(14), d(22), d(14), d(32));
-        scroll.addView(root);
-        setContentView(scroll);
-        scroll.setOnApplyWindowInsetsListener((v, insets) -> {
-            root.setPadding(d(14), d(20) + insets.getSystemWindowInsetTop(), d(14),
-                d(32) + insets.getSystemWindowInsetBottom());
-            return insets;
-        });
+        gridMode = SecureStore.preferences(this).getBoolean("notes_grid",true);
+        LinearLayout screen = new LinearLayout(this);
+        screen.setOrientation(LinearLayout.VERTICAL);
+        screen.setBackgroundColor(0xff1c1c1f);
+        screen.setFitsSystemWindows(true);
+        setContentView(screen);
 
-        LinearLayout top = new LinearLayout(this);
-        top.setGravity(Gravity.CENTER_VERTICAL);
-        root.addView(top);
-        TextView brand = ScreenUi.label(this, "Kept", 30, true);
-        brand.setTextColor(0xffc5ed9a);
-        top.addView(brand, new LinearLayout.LayoutParams(0, -2, 1));
-        Button refresh = small("↻");
-        top.addView(refresh);
-        refresh.setOnClickListener(v -> refresh());
-        Button pendingButton=small("⇅");
-        pendingButton.setContentDescription("Offline sync status");
-        top.addView(pendingButton);
-        pendingButton.setOnClickListener(v->startActivity(new Intent(this,SyncStatusActivity.class)));
-        Button settings = small("⚙");
-        top.addView(settings);
-        settings.setOnClickListener(v -> startActivity(new Intent(this, WidgetSettingsActivity.class)));
+        LinearLayout searchBar = new LinearLayout(this);
+        searchBar.setGravity(Gravity.CENTER_VERTICAL);
+        searchBar.setPadding(d(7),d(4),d(7),d(4));
+        searchBar.setBackground(shape(0xff333439,26,0xff424349));
+        LinearLayout.LayoutParams barParams=new LinearLayout.LayoutParams(-1,d(58));
+        barParams.setMargins(d(12),d(13),d(12),d(8));
+        screen.addView(searchBar,barParams);
 
-        search = ScreenUi.field(this, "⌕  Search notes", android.text.InputType.TYPE_CLASS_TEXT);
+        Button menu = compact("☰","Filter notes");
+        searchBar.addView(menu,new LinearLayout.LayoutParams(d(49),d(46)));
+        menu.setOnClickListener(this::openHomeMenu);
+
+        search=ScreenUi.field(this,"Search your notes",
+            android.text.InputType.TYPE_CLASS_TEXT);
         search.setSingleLine(true);
-        GradientDrawable searchBg = shape(0xff292f2e, 16, 0xff444d46);
-        search.setBackground(searchBg);
-        search.setPadding(d(15), d(12), d(15), d(12));
-        root.addView(search, ScreenUi.margins(this,0,14,0,12));
-        search.addTextChangedListener(new TextWatcher() {
-            @Override public void beforeTextChanged(CharSequence s, int start, int count, int after) { }
-            @Override public void onTextChanged(CharSequence s, int start, int before, int count) { render(); }
-            @Override public void afterTextChanged(Editable s) { }
+        search.setTextSize(17);
+        search.setBackgroundColor(Color.TRANSPARENT);
+        search.setPadding(d(2),0,d(2),0);
+        searchBar.addView(search,new LinearLayout.LayoutParams(0,d(49),1f));
+        search.addTextChangedListener(new TextWatcher(){
+            @Override public void beforeTextChanged(CharSequence text,int start,int count,int after){}
+            @Override public void onTextChanged(CharSequence text,int start,int before,int count){render();}
+            @Override public void afterTextChanged(Editable text){}
         });
 
-        LinearLayout controls = new LinearLayout(this);
-        controls.setGravity(Gravity.CENTER_VERTICAL);
-        root.addView(controls);
-        filter = new Spinner(this);
-        controls.addView(filter, new LinearLayout.LayoutParams(0, d(48), 1f));
-        filter.setOnItemSelectedListener(new android.widget.AdapterView.OnItemSelectedListener() {
-            @Override public void onNothingSelected(android.widget.AdapterView<?> parent) { }
-            @Override public void onItemSelected(android.widget.AdapterView<?> parent, View view, int pos, long id) {
-                if (pos < filterValues.size()) activeFilter = filterValues.get(pos);
+        layoutButton=compact(gridMode?"☷":"▦","Toggle notes grid or list view");
+        searchBar.addView(layoutButton,new LinearLayout.LayoutParams(d(45),d(46)));
+        layoutButton.setOnClickListener(v->{
+            gridMode=!gridMode;
+            SecureStore.preferences(this).edit().putBoolean("notes_grid",gridMode).apply();
+            layoutButton.setText(gridMode?"☷":"▦");
+            render();
+        });
+        Button settings=compact("⚙","Widget and account settings");
+        searchBar.addView(settings,new LinearLayout.LayoutParams(d(45),d(46)));
+        settings.setOnClickListener(v->startActivity(new Intent(this,WidgetSettingsActivity.class)));
+
+        ScrollView scroll=new ScrollView(this);
+        scroll.setFillViewport(true);
+        scroll.setClipToPadding(false);
+        screen.addView(scroll,new LinearLayout.LayoutParams(-1,0,1f));
+        root=new LinearLayout(this);
+        root.setOrientation(LinearLayout.VERTICAL);
+        root.setPadding(d(11),d(5),d(11),d(30));
+        scroll.addView(root);
+
+        LinearLayout filters=new LinearLayout(this);
+        filters.setGravity(Gravity.CENTER_VERTICAL);
+        root.addView(filters,new LinearLayout.LayoutParams(-1,d(47)));
+        filter=new Spinner(this);
+        filters.addView(filter,new LinearLayout.LayoutParams(0,d(45),1f));
+        filter.setOnItemSelectedListener(new android.widget.AdapterView.OnItemSelectedListener(){
+            @Override public void onNothingSelected(android.widget.AdapterView<?> parent){}
+            @Override public void onItemSelected(android.widget.AdapterView<?> parent,View view,int position,long id){
+                if(position<filterValues.size())activeFilter=filterValues.get(position);
                 render();
             }
         });
-        Button addList = small("☑");
-        controls.addView(addList);
-        addList.setContentDescription("New checklist");
-        addList.setOnClickListener(v -> create(true));
-        Button addNote = small("+");
-        controls.addView(addNote);
-        addNote.setContentDescription("New note");
-        addNote.setOnClickListener(v -> create(false));
+        Button refresh=compact("↻","Refresh Kept notes");
+        filters.addView(refresh,new LinearLayout.LayoutParams(d(45),d(45)));
+        refresh.setOnClickListener(v->refresh());
+        Button sync=compact("⇅","Offline sync status");
+        filters.addView(sync,new LinearLayout.LayoutParams(d(45),d(45)));
+        sync.setOnClickListener(v->startActivity(new Intent(this,SyncStatusActivity.class)));
 
-        hint = ScreenUi.hint(this, "Loading notes…");
-        root.addView(hint, ScreenUi.margins(this,4,12,0,12));
-        cards = new LinearLayout(this);
+        hint=ScreenUi.hint(this,"Loading notes…");
+        hint.setTextColor(0xffa8aea6);
+        root.addView(hint,ScreenUi.margins(this,8,3,0,9));
+        cards=new LinearLayout(this);
         cards.setOrientation(LinearLayout.VERTICAL);
         root.addView(cards);
+
+        // Fixed compose bar: quick capture stays reachable while scrolling.
+        LinearLayout capture=new LinearLayout(this);
+        capture.setGravity(Gravity.CENTER_VERTICAL);
+        capture.setPadding(d(14),d(6),d(14),d(6));
+        capture.setBackgroundColor(0xff2d2e33);
+        screen.addView(capture,new LinearLayout.LayoutParams(-1,d(68)));
+        Button newList=compact("☑","New checklist");
+        newList.setTextSize(25);
+        capture.addView(newList,new LinearLayout.LayoutParams(d(60),d(52)));
+        newList.setOnClickListener(v->create(true));
+        Button newNote=compact("＋  Take a note…","Create note");
+        newNote.setGravity(Gravity.CENTER_VERTICAL|Gravity.START);
+        newNote.setTextSize(17);
+        newNote.setTextColor(0xffdadbdd);
+        LinearLayout.LayoutParams composeParams=new LinearLayout.LayoutParams(0,d(52),1f);
+        composeParams.leftMargin=d(9);
+        capture.addView(newNote,composeParams);
+        newNote.setOnClickListener(v->create(false));
         installFilters();
+    }
+
+    private Button compact(String value,String description) {
+        Button button=new Button(this);
+        button.setText(value);
+        button.setAllCaps(false);
+        button.setTextSize(21);
+        button.setTextColor(0xffe3e3e6);
+        button.setContentDescription(description);
+        button.setBackgroundColor(Color.TRANSPARENT);
+        button.setPadding(0,0,0,0);
+        button.setMinHeight(0);
+        button.setMinimumHeight(0);
+        button.setMinWidth(0);
+        button.setMinimumWidth(0);
+        return button;
+    }
+
+    private void openHomeMenu(View anchor) {
+        PopupMenu menu=new PopupMenu(this,anchor);
+        menu.getMenu().add("All notes");
+        menu.getMenu().add("Pinned");
+        menu.getMenu().add("Checklists");
+        menu.getMenu().add("Widget settings");
+        menu.getMenu().add("Sync status");
+        menu.setOnMenuItemClickListener(item->{
+            String name=item.getTitle().toString();
+            String next="All notes".equals(name)?"all":
+                "Pinned".equals(name)?"pinned":
+                "Checklists".equals(name)?"checklists":null;
+            if(next!=null){
+                activeFilter=next;
+                int idx=filterValues.indexOf(next);
+                if(idx>=0)filter.setSelection(idx);
+                render();
+            }else if("Widget settings".equals(name))
+                startActivity(new Intent(this,WidgetSettingsActivity.class));
+            else if("Sync status".equals(name))
+                startActivity(new Intent(this,SyncStatusActivity.class));
+            return true;
+        });
+        menu.show();
     }
 
     private void create(boolean checklist) {
@@ -268,36 +342,95 @@ public final class NotesActivity extends Activity {
     }
 
     private void render() {
-        if (cards == null) return;
+        if(cards==null || search==null)return;
         cards.removeAllViews();
-        String q = search.getText().toString().trim().toLowerCase(java.util.Locale.ROOT);
-        ArrayList<JSONObject> shown = new ArrayList<>();
-        for (JSONObject n : notes) if (matches(n, q)) shown.add(n);
-        if (shown.isEmpty()) {
-            TextView empty = ScreenUi.hint(this, notes.isEmpty() ?
-                "No notes yet. Tap + to make your first note." : "No notes match your search or filter.");
+        String query=search.getText().toString().trim().toLowerCase(java.util.Locale.ROOT);
+        ArrayList<JSONObject> visible=new ArrayList<>();
+        for(JSONObject note:notes)if(matches(note,query))visible.add(note);
+        if(visible.isEmpty()){
+            TextView empty=ScreenUi.hint(this,notes.isEmpty()
+                ?"Your notes appear here. Tap 'Take a note' to start."
+                :"No notes match this search or filter.");
             empty.setGravity(Gravity.CENTER);
-            empty.setPadding(d(18),d(50),d(18),d(40));
+            empty.setPadding(d(18),d(65),d(18),d(40));
             cards.addView(empty);
             return;
         }
-        int columns = getResources().getConfiguration().screenWidthDp >= 610 ? 3 : 2;
-        for (int start=0; start<shown.size();start+=columns) {
-            LinearLayout row = new LinearLayout(this);
-            row.setOrientation(LinearLayout.HORIZONTAL);
-            cards.addView(row);
-            for (int i=0;i<columns;i++) {
-                JSONObject note = start+i<shown.size()? shown.get(start+i): null;
-                if (note==null) {
-                    View spacer = new View(this);
-                    row.addView(spacer,new LinearLayout.LayoutParams(0,d(1),1f));
-                    continue;
-                }
-                View card = card(note);
-                LinearLayout.LayoutParams p=new LinearLayout.LayoutParams(0,-2,1f);
-                p.setMargins(d(4),d(4),d(4),d(4));
-                row.addView(card,p);
+        if("all".equals(activeFilter) && query.isEmpty()){
+            ArrayList<JSONObject> pinned=new ArrayList<>();
+            ArrayList<JSONObject> other=new ArrayList<>();
+            for(JSONObject note:visible) {
+                if(note.optBoolean("pinned"))pinned.add(note);
+                else other.add(note);
             }
+            if(!pinned.isEmpty()){
+                heading("PINNED");
+                renderCards(pinned);
+            }
+            if(!other.isEmpty()){
+                if(!pinned.isEmpty())heading("OTHERS");
+                renderCards(other);
+            }
+        }else renderCards(visible);
+    }
+
+    private void heading(String title) {
+        TextView label=ScreenUi.hint(this,title);
+        label.setTextSize(11);
+        label.setLetterSpacing(0.11f);
+        label.setTextColor(0xffaeb1b0);
+        label.setPadding(d(10),d(20),d(5),d(9));
+        cards.addView(label);
+    }
+
+    static int columnsForWidth(int widthDp,boolean grid) {
+        return grid ? (widthDp>=610?3:widthDp>=270?2:1) : 1;
+    }
+
+    /** Balance Keep-style variable-height note cards in independent columns. */
+    static int estimatedCardHeight(JSONObject note) {
+        int title=KeptApi.plain(note.optString("noteTitle")).length();
+        int score=4+Math.min(4,title/24);
+        if(note.optBoolean("isCbox")){
+            JSONArray checks=note.optJSONArray("checkBoxes");
+            int unfinished=0;
+            for(int i=0;checks!=null&&i<checks.length();i++){
+                JSONObject item=checks.optJSONObject(i);
+                if(item!=null&&!item.optBoolean("done"))unfinished++;
+            }
+            score+=Math.min(5,unfinished)*2;
+        }else{
+            String body=KeptApi.formatted(note.optString("noteBody"));
+            score+=Math.min(11,Math.max(body.length()/33,
+                body.isEmpty()?0:body.split("\\n",-1).length));
+        }
+        return score;
+    }
+
+    private void renderCards(ArrayList<JSONObject> shown) {
+        int count=columnsForWidth(getResources().getConfiguration().screenWidthDp,gridMode);
+        if(count==1){
+            for(JSONObject note:shown)
+                cards.addView(card(note),ScreenUi.margins(this,4,4,4,6));
+            return;
+        }
+        LinearLayout holder=new LinearLayout(this);
+        holder.setOrientation(LinearLayout.HORIZONTAL);
+        cards.addView(holder);
+        ArrayList<LinearLayout> columns=new ArrayList<>();
+        int[] heights=new int[count];
+        for(int i=0;i<count;i++){
+            LinearLayout column=new LinearLayout(this);
+            column.setOrientation(LinearLayout.VERTICAL);
+            columns.add(column);
+            holder.addView(column,new LinearLayout.LayoutParams(0,-2,1f));
+        }
+        for(JSONObject note:shown){
+            int selected=0;
+            for(int i=1;i<count;i++)if(heights[i]<heights[selected])selected=i;
+            columns.get(selected).addView(card(note),
+                ScreenUi.margins(this,4,4,4,6));
+            heights[selected]+=estimatedCardHeight(note);
         }
     }
 
@@ -325,9 +458,14 @@ public final class NotesActivity extends Activity {
         } else if (note.optBoolean("isCbox")) {
             JSONArray items=note.optJSONArray("checkBoxes");
             int shown=0;
+            int completed=0;
+            for(int i=0;items!=null && i<items.length();i++){
+                JSONObject item=items.optJSONObject(i);
+                if(item!=null && item.optBoolean("done"))completed++;
+            }
             for(int i=0;items!=null && i<items.length() && shown<5;i++) {
                 JSONObject item=items.optJSONObject(i);
-                if(item==null)continue;
+                if(item==null || item.optBoolean("done"))continue;
                 String text=KeptApi.plain(item.optString("data"));
                 if(text.isEmpty())continue;
                 TextView line=ScreenUi.label(this,
@@ -336,6 +474,11 @@ public final class NotesActivity extends Activity {
                 line.setEllipsize(android.text.TextUtils.TruncateAt.END);
                 card.addView(line,ScreenUi.margins(this,0,8,0,0));
                 shown++;
+            }
+            if(completed>0){
+                TextView footer=ScreenUi.hint(this,"▸ ("+completed+") Completed items");
+                footer.setTextColor(0xffb5b7b1);
+                card.addView(footer,ScreenUi.margins(this,0,14,0,0));
             }
         } else {
             String body=KeptApi.formatted(note.optString("noteBody"));

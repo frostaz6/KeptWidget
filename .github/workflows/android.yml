@@ -1,7 +1,7 @@
 name: Android APK
 on:
   push:
-    branches: [main]
+    branches: [main, 'develop/v0.4']
   pull_request:
   workflow_dispatch:
 
@@ -10,6 +10,9 @@ permissions:
 
 jobs:
   build:
+    # A push to develop/v0.4 also emits a pull_request event; test once per
+    # commit to avoid parallel Gradle/Robolectric downloads and Maven 429s.
+    if: ${{ github.event_name != 'pull_request' || github.head_ref != 'develop/v0.4' }}
     runs-on: ubuntu-latest
     env:
       RELEASE_KEY_PRESENT: "${{ secrets.KEPTWIDGET_KEYSTORE_B64 != '' && secrets.KEPTWIDGET_KEYSTORE_PASSWORD != '' }}"
@@ -28,35 +31,40 @@ jobs:
           test -n "$SDKMANAGER"
           "$SDKMANAGER" --install "platforms;android-35" "build-tools;35.0.0"
       - name: Run widget formatting and sync tests
-        run: gradle --no-daemon :app:testDebugUnitTest
+        run: |
+          for attempt in 1 2 3; do
+            if gradle --no-daemon :app:testDebugUnitTest; then exit 0; fi
+            if [ "$attempt" -eq 3 ]; then exit 1; fi
+            sleep $((15 * attempt))
+          done
       - name: Build debug APK (testing only; not upgrade-stable)
         run: gradle --no-daemon :app:assembleDebug
       - name: Upload debug APK
         uses: actions/upload-artifact@v4
         with:
-          name: KeptWidget-0.3.0-debug-APK
+          name: KeptWidget-development-debug-APK
           path: app/build/outputs/apk/debug/app-debug.apk
           if-no-files-found: error
       - name: Restore persistent release signing key
-        if: ${{ env.RELEASE_KEY_PRESENT == 'true' && github.ref == 'refs/heads/main' }}
+        if: ${{ env.RELEASE_KEY_PRESENT == 'true' && (github.ref == 'refs/heads/main' || (github.event_name == 'push' && github.ref == 'refs/heads/develop/v0.4')) }}
         env:
           SIGNING_KEY_BASE64: ${{ secrets.KEPTWIDGET_KEYSTORE_B64 }}
         run: |
           umask 077
           printf '%s' "$SIGNING_KEY_BASE64" | base64 --decode > "$RUNNER_TEMP/keptwidget-release.jks"
           echo "ANDROID_RELEASE_KEYSTORE=$RUNNER_TEMP/keptwidget-release.jks" >> "$GITHUB_ENV"
-      - name: Build stable signed release APK
-        if: ${{ env.RELEASE_KEY_PRESENT == 'true' && github.ref == 'refs/heads/main' }}
+      - name: Build permanently signed APK
+        if: ${{ env.RELEASE_KEY_PRESENT == 'true' && (github.ref == 'refs/heads/main' || (github.event_name == 'push' && github.ref == 'refs/heads/develop/v0.4')) }}
         env:
           ANDROID_RELEASE_PASSWORD: ${{ secrets.KEPTWIDGET_KEYSTORE_PASSWORD }}
         run: gradle --no-daemon :app:assembleRelease
       - name: Upload signed release APK
-        if: ${{ env.RELEASE_KEY_PRESENT == 'true' && github.ref == 'refs/heads/main' }}
+        if: ${{ env.RELEASE_KEY_PRESENT == 'true' && (github.ref == 'refs/heads/main' || (github.event_name == 'push' && github.ref == 'refs/heads/develop/v0.4')) }}
         uses: actions/upload-artifact@v4
         with:
-          name: KeptWidget-0.3.0-signed-APK
+          name: KeptWidget-0.4.0-beta2-signed-APK
           path: app/build/outputs/apk/release/app-release.apk
           if-no-files-found: error
       - name: Explain missing signing configuration
-        if: ${{ env.RELEASE_KEY_PRESENT != 'true' && github.ref == 'refs/heads/main' }}
+        if: ${{ env.RELEASE_KEY_PRESENT != 'true' && (github.ref == 'refs/heads/main' || (github.event_name == 'push' && github.ref == 'refs/heads/develop/v0.4')) }}
         run: echo "::notice::Only a debug APK was built. Configure KEPTWIDGET_KEYSTORE_B64 and KEPTWIDGET_KEYSTORE_PASSWORD repository secrets to enable a permanently signed release APK."
