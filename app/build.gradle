@@ -42,6 +42,12 @@ android {
 
   testOptions {
     unitTests.includeAndroidResources = true
+    unitTests.all {
+      // Robolectric downloads Android instrumented runtime JARs separately
+      // from Gradle. GitHub runners have been HTTP 429-limited by Maven Central.
+      systemProperty 'robolectric.dependency.repo.url',
+          'https://maven-central.storage-download.googleapis.com/maven2/'
+    }
   }
 
   compileOptions {
